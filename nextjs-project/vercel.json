@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://express-5c8e21e3j-tafsirs-projects-6858d6d0.vercel.app/api/:path*" 
+    }
+  ]
+}
