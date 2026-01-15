@@ -100,8 +100,8 @@ export default function Features() {
             viewport={{ once: true }}
             className="text-5xl md:text-7xl font-black text-black tracking-tighter leading-none mb-6"
           >
-            NOT JUST A BIKE, <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">AN ARTIFACT.</span>
+            NOT JUST A BIKE <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">AN ARTIFACT</span>
           </motion.h2>
           
           <motion.p 

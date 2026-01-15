@@ -540,6 +540,15 @@
       "role": "merchandiser",
       "isVerified": false,
       "createdAt": "2026-01-14T16:45:15.267Z"
+    },
+    {
+      "id": "7",
+      "name": "Niloy",
+      "email": "niloy@gmail.com",
+      "password": "niloy123",
+      "role": "customer",
+      "isVerified": true,
+      "createdAt": "2026-01-15T18:48:25.144Z"
     }
   ],
   "cart": [

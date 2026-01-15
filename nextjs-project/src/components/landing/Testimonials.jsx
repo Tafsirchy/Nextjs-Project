@@ -107,7 +107,7 @@ export default function Testimonials() {
            </motion.div>
            <h2 className="text-5xl md:text-7xl font-black text-zinc-900 leading-none tracking-tighter mb-6">
               VOICES FROM THE <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">MIDNIGHT CLUB.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">MIDNIGHT CLUB</span>
            </h2>
         </div>
 

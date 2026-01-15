@@ -282,7 +282,7 @@ export default function HowItWorks() {
            </motion.span>
            <h2 className="text-5xl md:text-7xl font-black text-zinc-900 leading-[0.9] tracking-tighter mb-6">
               HOW TO JOIN THE <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">MIDNIGHT RIDE.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">MIDNIGHT RIDE</span>
            </h2>
         </div>
 

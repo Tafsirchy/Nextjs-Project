@@ -145,7 +145,7 @@ export default function Services() {
                    </motion.div>
                    <h2 className="text-5xl md:text-6xl font-black text-white leading-none tracking-tighter mb-6">
                       BEYOND THE <br />
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600 font-outline-xs">STANDARD.</span>
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600 font-outline-xs">STANDARD</span>
                    </h2>
                    <p className="text-gray-400 text-lg leading-relaxed max-w-xl">
                       We offer a suite of elite services designed for the most discerning riders on the planet.
