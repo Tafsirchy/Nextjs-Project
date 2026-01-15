@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,11 +30,11 @@ export default function MerchandiserDashboard({ user }) {
   const fetchAdminData = useCallback(async () => {
     try {
       const [ordersRes, bikesRes, usersRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/orders', {
+        fetch(`${API_URL}/api/admin/orders`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         }),
-        fetch('http://localhost:5000/api/bikes'),
-        fetch('http://localhost:5000/api/admin/users', {
+        fetch(`${API_URL}/api/bikes`),
+        fetch(`${API_URL}/api/admin/users`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         })
       ]);
@@ -50,7 +51,7 @@ export default function MerchandiserDashboard({ user }) {
 
         // Fetch all reviews for moderation
         const reviewsPromises = bikesData.bikes.map(b => 
-          fetch(`http://localhost:5000/api/reviews/${b.id}`).then(r => r.json())
+          fetch(`${API_URL}/api/reviews/${b.id}`).then(r => r.json())
         );
         const allRes = await Promise.all(reviewsPromises);
         const reviews = allRes.flatMap(res => res.success ? res.reviews.map(r => ({
@@ -77,7 +78,7 @@ export default function MerchandiserDashboard({ user }) {
   async function handleDeleteReview(id) {
     if (!confirm("Are you sure you want to delete this review?")) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/reviews/${id}`, {
+      const response = await fetch(`${API_URL}/api/reviews/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
@@ -94,7 +95,7 @@ export default function MerchandiserDashboard({ user }) {
   async function handleDeleteBike(id) {
     if (!confirm("Are you sure you want to delete this listing?")) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/bikes/${id}`, {
+      const response = await fetch(`${API_URL}/api/bikes/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
@@ -113,7 +114,7 @@ export default function MerchandiserDashboard({ user }) {
     if (!bulkJson.trim()) return;
     try {
       const bikesToUpload = JSON.parse(bulkJson);
-      const response = await fetch('http://localhost:5000/api/bikes/bulk', {
+      const response = await fetch(`${API_URL}/api/bikes/bulk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -541,7 +542,7 @@ export default function MerchandiserDashboard({ user }) {
   async function handleStatusUpdate(orderNumber, newStatus) {
     setUpdating(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/status/${orderNumber}`, {
+      const response = await fetch(`${API_URL}/api/orders/status/${orderNumber}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -567,7 +568,7 @@ export default function MerchandiserDashboard({ user }) {
   async function handleDealerVerify(email, status) {
     setUpdating(true);
     try {
-      const response = await fetch('http://localhost:5000/api/admin/verify-dealer', {
+      const response = await fetch(`${API_URL}/api/admin/verify-dealer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

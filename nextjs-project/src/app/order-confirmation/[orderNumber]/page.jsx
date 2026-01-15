@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -23,7 +24,7 @@ export default function OrderConfirmationPage() {
 
     async function fetchOrder() {
       try {
-        const response = await fetch(`http://localhost:5000/api/orders/${orderNumber}`, {
+        const response = await fetch(`${API_URL}/api/orders/${orderNumber}`, {
           headers: {
             'Authorization': `Bearer ${session.user.email}`
           }

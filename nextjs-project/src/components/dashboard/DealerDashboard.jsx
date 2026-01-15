@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,11 +68,11 @@ export default function DealerDashboard({ user }) {
   const fetchDealerData = useCallback(async () => {
     try {
       const [ordersRes, bikesRes, inventoryRes] = await Promise.all([
-        fetch('http://localhost:5000/api/orders', {
+        fetch(`${API_URL}/api/orders`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         }),
-        fetch('http://localhost:5000/api/bikes'),
-        fetch('http://localhost:5000/api/bikes/my-inventory', {
+        fetch(`${API_URL}/api/bikes`),
+        fetch(`${API_URL}/api/bikes/my-inventory`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         })
       ]);
@@ -126,7 +127,7 @@ export default function DealerDashboard({ user }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const response = await fetch('http://localhost:5000/api/dealer/verify', {
+      const response = await fetch(`${API_URL}/api/dealer/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -186,7 +187,7 @@ export default function DealerDashboard({ user }) {
     
     setSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/bikes/${bikeToDelete.id}`, {
+      const res = await fetch(`${API_URL}/api/bikes/${bikeToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
@@ -213,7 +214,7 @@ export default function DealerDashboard({ user }) {
     
     setSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/bikes/${editingBike.id}`, {
+      const res = await fetch(`${API_URL}/api/bikes/${editingBike.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

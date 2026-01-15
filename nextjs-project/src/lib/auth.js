@@ -1,3 +1,5 @@
+import { API_URL } from "./api";
+
 import CredentialsProvider from "next-auth/providers/credentials";
 
 export const authOptions = {
@@ -24,7 +26,7 @@ export const authOptions = {
         
         // Check registered users from database
         try {
-          const response = await fetch('http://localhost:5000/api/auth/login', {
+          const response = await fetch(`${API_URL}/api/auth/login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

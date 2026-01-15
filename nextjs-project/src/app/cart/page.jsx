@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -75,7 +76,7 @@ export default function CartPage() {
   const handleRequestQuote = async () => {
     setRequestingQuote(true);
     try {
-      const response = await fetch('http://localhost:5000/api/quotes', {
+      const response = await fetch(`${API_URL}/api/quotes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

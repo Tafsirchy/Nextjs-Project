@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -34,7 +35,7 @@ export default function OrderDetailsPage() {
 
     const fetchOrder = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/orders/${orderNumber}`, {
+        const response = await fetch(`${API_URL}/api/orders/${orderNumber}`, {
           headers: {
             'Authorization': `Bearer ${session.user.email}`
           }
@@ -65,7 +66,7 @@ export default function OrderDetailsPage() {
   const handleSendEmail = async () => {
     setSendingEmail(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/orders/${orderNumber}/email`, {
+      const response = await fetch(`${API_URL}/api/orders/${orderNumber}/email`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.user.email}`

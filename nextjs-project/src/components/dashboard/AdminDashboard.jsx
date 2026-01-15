@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { Edit, useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,13 +48,13 @@ export default function AdminDashboard({ user }) {
   const fetchAdminData = useCallback(async () => {
     try {
       const [statsRes, usersRes, settingsRes, inventoryRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/stats', {
+        fetch(`${API_URL}/api/admin/stats`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         }),
-        fetch('http://localhost:5000/api/admin/users', {
+        fetch(`${API_URL}/api/admin/users`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         }),
-        fetch('http://localhost:5000/api/admin/settings', {
+        fetch(`${API_URL}/api/admin/settings`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
         })
       ]);
@@ -72,7 +73,7 @@ export default function AdminDashboard({ user }) {
       if (settingsData.success) setSettings(settingsData.settings);
 
       // Fetch promos
-      const promoRes = await fetch('http://localhost:5000/api/promos');
+      const promoRes = await fetch(`${API_URL}/api/promos`);
       const promoData = await promoRes.json();
       if (promoData.success) setPromos(promoData.promos);
 
@@ -90,7 +91,7 @@ export default function AdminDashboard({ user }) {
   async function handleRoleChange(email, newRole) {
     setUpdating(true);
     try {
-      const response = await fetch('http://localhost:5000/api/admin/users/role', {
+      const response = await fetch(`${API_URL}/api/admin/users/role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +116,7 @@ export default function AdminDashboard({ user }) {
   async function handleDealerApproval(email, status) {
     setUpdating(true);
     try {
-      const response = await fetch('http://localhost:5000/api/admin/verify-dealer', {
+      const response = await fetch(`${API_URL}/api/admin/verify-dealer`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ export default function AdminDashboard({ user }) {
     setUpdating(true);
     try {
       const newValue = !settings[key];
-      const response = await fetch('http://localhost:5000/api/admin/settings', {
+      const response = await fetch(`${API_URL}/api/admin/settings`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +173,7 @@ export default function AdminDashboard({ user }) {
     
     setUpdating(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/bikes/${bikeToDelete.id}`, {
+      const res = await fetch(`${API_URL}/api/bikes/${bikeToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
@@ -199,7 +200,7 @@ export default function AdminDashboard({ user }) {
     
     setUpdating(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/bikes/${editingBike.id}`, {
+      const res = await fetch(`${API_URL}/api/bikes/${editingBike.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -575,7 +576,7 @@ export default function AdminDashboard({ user }) {
                       onClick={async () => {
                         setUpdating(true);
                         try {
-                          const res = await fetch('http://localhost:5000/api/admin/promos', {
+                          const res = await fetch(`${API_URL}/api/admin/promos`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.email}` },
                             body: JSON.stringify(newPromo)
@@ -617,7 +618,7 @@ export default function AdminDashboard({ user }) {
                             if (!confirm('Are you sure?')) return;
                             setUpdating(true);
                             try {
-                              const res = await fetch(`http://localhost:5000/api/admin/promos/${promo.code}`, {
+                              const res = await fetch(`${API_URL}/api/admin/promos/${promo.code}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `Bearer ${user.email}` }
                               });

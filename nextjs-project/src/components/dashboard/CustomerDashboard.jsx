@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ export default function CustomerDashboard({ user }) {
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/orders', {
+      const response = await fetch(`${API_URL}/api/orders`, {
         headers: {
           'Authorization': `Bearer ${user.email}`
         }
@@ -92,7 +93,7 @@ export default function CustomerDashboard({ user }) {
   const fetchAddresses = useCallback(async () => {
     setLoadingAddresses(true);
     try {
-      const response = await fetch('http://localhost:5000/api/user/addresses', {
+      const response = await fetch(`${API_URL}/api/user/addresses`, {
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
       const data = await response.json();
@@ -107,7 +108,7 @@ export default function CustomerDashboard({ user }) {
   const fetchUserReviews = useCallback(async () => {
     setLoadingReviews(true);
     try {
-      const response = await fetch('http://localhost:5000/api/user/reviews', {
+      const response = await fetch(`${API_URL}/api/user/reviews`, {
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
       const data = await response.json();
@@ -133,7 +134,7 @@ export default function CustomerDashboard({ user }) {
   const handleAddAddress = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/user/addresses', {
+      const response = await fetch(`${API_URL}/api/user/addresses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +156,7 @@ export default function CustomerDashboard({ user }) {
 
   const handleDeleteAddress = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/user/addresses/${id}`, {
+      const response = await fetch(`${API_URL}/api/user/addresses/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.email}` }
       });
@@ -172,7 +173,7 @@ export default function CustomerDashboard({ user }) {
   const handleDeleteReview = async (id) => {
     if (!confirm("Are you sure you want to delete this review?")) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/reviews/${id}`, {
+      const response = await fetch(`${API_URL}/api/reviews/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${user.email}` }
       });

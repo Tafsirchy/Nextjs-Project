@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -22,7 +23,7 @@ export default function QuoteDetailsPage() {
       // For now, we'll fetch all and filter client-side or use a new endpoint if available.
       // Let's assume we can fetch it via the user's dashboard data or a new endpoint.
       // Implementing a simple fetching logic:
-      const response = await fetch('http://localhost:5000/api/quotes/my-quotes', {
+      const response = await fetch(`${API_URL}/api/quotes/my-quotes`, {
         headers: { 'Authorization': `Bearer ${session?.user?.email}` }
       });
       const data = await response.json();

@@ -1,3 +1,4 @@
+import { API_URL } from "@/lib/api";
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
@@ -12,7 +13,7 @@ export function CartProvider({ children }) {
 
   const loadCart = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/cart', {
+      const response = await fetch(`${API_URL}/api/cart`, {
         headers: {
           'Authorization': `Bearer ${session?.user?.email}`
         }
@@ -50,7 +51,7 @@ export function CartProvider({ children }) {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/cart/add', {
+      const response = await fetch(`${API_URL}/api/cart/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,7 +86,7 @@ export function CartProvider({ children }) {
   async function removeFromCart(bikeId) {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/cart/remove/${bikeId}`, {
+      const response = await fetch(`${API_URL}/api/cart/remove/${bikeId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.user.email}`
@@ -118,7 +119,7 @@ export function CartProvider({ children }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/cart/update/${bikeId}`, {
+      const response = await fetch(`${API_URL}/api/cart/update/${bikeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +149,7 @@ export function CartProvider({ children }) {
   async function clearCart() {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/cart/clear', {
+      const response = await fetch(`${API_URL}/api/cart/clear`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.user.email}`

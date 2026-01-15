@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +22,7 @@ export default function BikeReviews({ bikeId }) {
 
   const fetchReviews = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/reviews/${bikeId}`);
+      const response = await fetch(`${API_URL}/api/reviews/${bikeId}`);
       const data = await response.json();
       if (data.success) {
         setReviews(data.reviews);
@@ -71,8 +72,9 @@ export default function BikeReviews({ bikeId }) {
     }
 
     setSubmitting(true);
+    setSubmitting(true);
     try {
-      const response = await fetch("http://localhost:5000/api/reviews/add", {
+      const response = await fetch(`${API_URL}/api/reviews/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

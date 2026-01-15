@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { fetchBikeById } from "@/lib/api";
+import { API_URL, fetchBikeById } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Star, Gauge, Zap, Weight, Palette, CheckCircle, ShoppingCart } from "lucide-react";
@@ -43,7 +43,7 @@ export default function BikeDetailsPage() {
   const fetchPricing = useCallback(async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/pricing/${bike.id}?quantity=${quantity}`,
+        `${API_URL}/api/pricing/${bike.id}?quantity=${quantity}`,
         {
           headers: session?.user?.email 
             ? { 'Authorization': `Bearer ${session.user.email}` }

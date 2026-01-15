@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
@@ -16,7 +17,7 @@ export function WishlistProvider({ children }) {
     
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:5000/api/wishlist", {
+      const response = await fetch(`${API_URL}/api/wishlist`, {
         headers: {
           Authorization: `Bearer ${session.user.email}`
         }
@@ -43,7 +44,7 @@ export function WishlistProvider({ children }) {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/wishlist/add", {
+      const response = await fetch(`${API_URL}/api/wishlist/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -72,7 +73,7 @@ export function WishlistProvider({ children }) {
     if (!session) return false;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/wishlist/remove/${bikeId}`, {
+      const response = await fetch(`${API_URL}/api/wishlist/remove/${bikeId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${session.user.email}`

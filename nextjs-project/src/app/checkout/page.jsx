@@ -1,5 +1,6 @@
 "use client";
 
+import { API_URL } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useSession } from "next-auth/react";
@@ -67,7 +68,7 @@ export default function CheckoutPage() {
     
     setValidatingPromo(true);
     try {
-      const response = await fetch('http://localhost:5000/api/promos/validate', {
+      const response = await fetch(`${API_URL}/api/promos/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: promoCode })
@@ -97,7 +98,7 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/create-payment-intent', {
+      const response = await fetch(`${API_URL}/api/create-payment-intent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +149,7 @@ export default function CheckoutPage() {
         total: Math.max(0, (getCartTotal() - discount) + ((getCartTotal() - discount) * 0.1) + 500)
       };
 
-      const response = await fetch('http://localhost:5000/api/orders/create', {
+      const response = await fetch(`${API_URL}/api/orders/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
