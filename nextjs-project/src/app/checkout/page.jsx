@@ -194,8 +194,8 @@ export default function CheckoutPage() {
               Back to Cart
             </Button>
           </Link>
-          <h1 className="text-4xl font-bold mb-2">Checkout</h1>
-          <p className="text-muted-foreground">Complete your purchase</p>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">Checkout</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Complete your purchase</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -209,8 +209,8 @@ export default function CheckoutPage() {
                       Shipping Address
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-5">
-                    <div className="grid md:grid-cols-2 gap-4">
+                  <CardContent className="space-y-4 sm:space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium mb-2 block">Full Name *</label>
                         <Input
@@ -234,7 +234,7 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium mb-2 block">Phone *</label>
                         <Input
@@ -258,7 +258,7 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-sm font-medium mb-2 block">City *</label>
                         <Input
@@ -324,33 +324,33 @@ export default function CheckoutPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Payment Method Toggle */}
-                  <div className="flex gap-4 mb-6">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
                     <button
                       onClick={() => setPaymentMethod('stripe')}
-                      className={`flex-1 p-4 border-2 rounded-xl text-left transition-all ${
+                      className={`flex-1 p-3 sm:p-4 border-2 rounded-xl text-left transition-all ${
                         paymentMethod === 'stripe' 
                         ? 'border-purple-600 bg-purple-50 text-purple-900' 
                         : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
-                      <div className="font-bold flex items-center gap-2">
-                        <CreditCard className="h-5 w-5" /> Credit/Debit Card
+                      <div className="font-bold flex items-center gap-2 text-sm sm:text-base">
+                        <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" /> Credit/Debit Card
                       </div>
-                      <p className="text-xs mt-1 text-slate-500">Secure payment via Stripe</p>
+                      <p className="text-[10px] sm:text-xs mt-1 text-slate-500">Secure payment via Stripe</p>
                     </button>
                     
                     <button
                       onClick={() => setPaymentMethod('cod')}
-                      className={`flex-1 p-4 border-2 rounded-xl text-left transition-all ${
+                      className={`flex-1 p-3 sm:p-4 border-2 rounded-xl text-left transition-all ${
                         paymentMethod === 'cod' 
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-900' 
                         : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
-                      <div className="font-bold flex items-center gap-2">
-                        <DollarSign className="h-5 w-5" /> Cash on Delivery
+                      <div className="font-bold flex items-center gap-2 text-sm sm:text-base">
+                        <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" /> Cash on Delivery
                       </div>
-                      <p className="text-xs mt-1 text-slate-500">Pay when you receive</p>
+                      <p className="text-[10px] sm:text-xs mt-1 text-slate-500">Pay when you receive</p>
                     </button>
                   </div>
 
@@ -398,7 +398,7 @@ export default function CheckoutPage() {
           </div>
 
           <div className="lg:col-span-1 border-0">
-            <Card className="sticky top-24 border-slate-200 shadow-xl overflow-hidden">
+            <Card className="lg:sticky top-24 border-slate-200 shadow-xl overflow-hidden">
               <div className="bg-slate-900 px-6 py-4 text-white">
                 <h2 className="text-xl font-bold italic tracking-wider flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-purple-400" />

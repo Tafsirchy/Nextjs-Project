@@ -1,9 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fs = require('fs').promises;
-const path = require('path');
-const STRIPE_SECRET_KEY = 'sk_test_51O...[PLACEHOLDER]...';
+require('dotenv').config();
+const { connectToDatabase } = require('./db');
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_51O...[PLACEHOLDER]...';
+console.log('Stripe Secret Key loaded (prefix):', STRIPE_SECRET_KEY.substring(0, 10));
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
 
 const app = express();
@@ -94,9 +95,6 @@ const generateOrderEmail = (order) => {
   `;
 };
 
-// --- DATA PERSISTENCE ---
-const DATA_FILE = path.join(__dirname, 'data.json');
-
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
@@ -107,28 +105,6 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
-
-// Helper function to read data
-async function readData() {
-  try {
-    const data = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error reading data file:', error);
-    return { bikes: [] };
-  }
-}
-
-// Helper function to write data
-async function writeData(data) {
-  try {
-    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
-    return true;
-  } catch (error) {
-    console.error('Error writing data file:', error);
-    return false;
-  }
-}
 
 // Routes
 
@@ -157,49 +133,42 @@ app.get('/', (req, res) => {
 // Get all bikes
 app.get('/api/bikes', async (req, res) => {
   try {
-    const data = await readData();
+    const db = await connectToDatabase();
     const { category, featured, minPrice, maxPrice, search, onSale, inStock } = req.query;
     
-    let bikes = data.bikes || [];
+    // Build MongoDB query
+    let query = {};
     
-    // Filter by category
     if (category && category !== 'all') {
-      bikes = bikes.filter(bike => 
-        bike.category.toLowerCase() === category.toLowerCase()
-      );
+      query.category = new RegExp(`^${category}$`, 'i');
     }
     
-    // Filter by featured
     if (featured === 'true') {
-      bikes = bikes.filter(bike => bike.featured === true);
+      query.featured = true;
     }
 
-    // Filter by on sale (items with price < 10000)
     if (onSale === 'true') {
-      bikes = bikes.filter(bike => bike.price < 10000);
+      query.price = { $lt: 10000 };
     }
 
-    // Filter by in stock
     if (inStock === 'true') {
-      bikes = bikes.filter(bike => bike.stock > 0);
+      query.stock = { $gt: 0 };
     }
     
-    // Filter by price range
-    if (minPrice) {
-      bikes = bikes.filter(bike => bike.price >= parseInt(minPrice));
-    }
-    if (maxPrice) {
-      bikes = bikes.filter(bike => bike.price <= parseInt(maxPrice));
+    if (minPrice || maxPrice) {
+      query.price = query.price || {};
+      if (minPrice) query.price.$gte = parseInt(minPrice);
+      if (maxPrice) query.price.$lte = parseInt(maxPrice);
     }
     
-    // Search by name or description
     if (search) {
-      const searchLower = search.toLowerCase();
-      bikes = bikes.filter(bike => 
-        bike.name.toLowerCase().includes(searchLower) ||
-        bike.description.toLowerCase().includes(searchLower)
-      );
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
     }
+    
+    const bikes = await db.collection('bikes').find(query).toArray();
     
     res.json({
       success: true,
@@ -215,11 +184,49 @@ app.get('/api/bikes', async (req, res) => {
   }
 });
 
+// ============================================
+// BIKES ROUTE
+// ============================================
+
+// Get user's created bikes (inventory) - THIS MUST BE BEFORE /:id
+app.get('/api/bikes/my-inventory', async (req, res) => {
+  try {
+    const userEmail = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!userEmail) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    
+    const db = await connectToDatabase();
+    const user = await db.collection('users').findOne({ email: userEmail });
+    
+    // Admins can see all bikes, others see only their created bikes
+    let myBikes;
+    if (user?.role === 'admin') {
+      myBikes = await db.collection('bikes').find({}).toArray();
+    } else {
+      myBikes = await db.collection('bikes').find({ createdBy: userEmail }).toArray();
+    }
+    
+    res.json({
+      success: true,
+      count: myBikes.length,
+      bikes: myBikes
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching inventory',
+      error: error.message
+    });
+  }
+});
+
 // Get single bike by ID
 app.get('/api/bikes/:id', async (req, res) => {
   try {
-    const data = await readData();
-    const bike = data.bikes.find(b => b.id === req.params.id);
+    const db = await connectToDatabase();
+    const bike = await db.collection('bikes').findOne({ id: req.params.id });
     
     if (!bike) {
       return res.status(404).json({
@@ -236,40 +243,6 @@ app.get('/api/bikes/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching bike',
-      error: error.message
-    });
-  }
-});
-
-// Get user's created bikes (inventory)
-app.get('/api/bikes/my-inventory', async (req, res) => {
-  try {
-    const userEmail = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!userEmail) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-    
-    const data = await readData();
-    const user = data.users?.find(u => u.email === userEmail);
-    
-    // Admins can see all bikes, others see only their created bikes
-    let myBikes;
-    if (user?.role === 'admin') {
-      myBikes = data.bikes || [];
-    } else {
-      myBikes = (data.bikes || []).filter(bike => bike.createdBy === userEmail);
-    }
-    
-    res.json({
-      success: true,
-      count: myBikes.length,
-      bikes: myBikes
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching inventory',
       error: error.message
     });
   }
@@ -293,13 +266,16 @@ app.post('/api/bikes', async (req, res) => {
       });
     }
     
-    const data = await readData();
+    const db = await connectToDatabase();
     
-    // Generate new ID
-    const maxId = data.bikes.length > 0 
-      ? Math.max(...data.bikes.map(b => parseInt(b.id))) 
-      : 0;
-    const newId = (maxId + 1).toString();
+    // Generate new ID (find max ID and increment)
+    const lastBike = await db.collection('bikes').find().sort({ id: -1 }).limit(1).toArray();
+    let nextId = 1;
+    if (lastBike.length > 0) {
+      // Handle potential non-numeric IDs if they exist, but here we expect numeric strings
+      nextId = parseInt(lastBike[0].id) + 1;
+    }
+    const newId = nextId.toString();
     
     // Create new bike object
     const newBike = {
@@ -321,18 +297,8 @@ app.post('/api/bikes', async (req, res) => {
       createdBy: creatorEmail
     };
     
-    // Add to data
-    data.bikes.push(newBike);
-    
-    // Save to file
-    const saved = await writeData(data);
-    
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error saving bike to database'
-      });
-    }
+    // Save to MongoDB
+    await db.collection('bikes').insertOne(newBike);
     
     res.status(201).json({
       success: true,
@@ -357,10 +323,11 @@ app.put('/api/bikes/:id', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
     
-    const data = await readData();
-    const bikeIndex = data.bikes.findIndex(b => b.id === req.params.id);
+    const db = await connectToDatabase();
     
-    if (bikeIndex === -1) {
+    const bike = await db.collection('bikes').findOne({ id: req.params.id });
+    
+    if (!bike) {
       return res.status(404).json({
         success: false,
         message: 'Bike not found'
@@ -368,8 +335,7 @@ app.put('/api/bikes/:id', async (req, res) => {
     }
     
     // Check permissions: only creator or admin can update
-    const user = data.users?.find(u => u.email === userEmail);
-    const bike = data.bikes[bikeIndex];
+    const user = await db.collection('users').findOne({ email: userEmail });
     const isCreator = bike.createdBy === userEmail;
     const isAdmin = user?.role === 'admin';
     
@@ -381,26 +347,21 @@ app.put('/api/bikes/:id', async (req, res) => {
     }
     
     // Update bike with new data
-    data.bikes[bikeIndex] = {
-      ...data.bikes[bikeIndex],
+    const updatedBike = {
+      ...bike,
       ...req.body,
       id: req.params.id // Preserve original ID
     };
     
-    // Save to file
-    const saved = await writeData(data);
-    
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error updating bike to database'
-      });
-    }
+    await db.collection('bikes').updateOne(
+      { id: req.params.id },
+      { $set: updatedBike }
+    );
     
     res.json({
       success: true,
       message: 'Bike updated successfully',
-      bike: data.bikes[bikeIndex]
+      bike: updatedBike
     });
   } catch (error) {
     res.status(500).json({
@@ -420,10 +381,11 @@ app.delete('/api/bikes/:id', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
     
-    const data = await readData();
-    const bikeIndex = data.bikes.findIndex(b => b.id === req.params.id);
+    const db = await connectToDatabase();
     
-    if (bikeIndex === -1) {
+    const bike = await db.collection('bikes').findOne({ id: req.params.id });
+    
+    if (!bike) {
       return res.status(404).json({
         success: false,
         message: 'Bike not found'
@@ -431,8 +393,7 @@ app.delete('/api/bikes/:id', async (req, res) => {
     }
     
     // Check permissions: only creator or admin can delete
-    const user = data.users?.find(u => u.email === userEmail);
-    const bike = data.bikes[bikeIndex];
+    const user = await db.collection('users').findOne({ email: userEmail });
     const isCreator = bike.createdBy === userEmail;
     const isAdmin = user?.role === 'admin';
     
@@ -443,23 +404,13 @@ app.delete('/api/bikes/:id', async (req, res) => {
       });
     }
     
-    // Remove bike
-    const deletedBike = data.bikes.splice(bikeIndex, 1)[0];
-    
-    // Save to file
-    const saved = await writeData(data);
-    
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error deleting bike from database'
-      });
-    }
+    // Delete bike from MongoDB
+    await db.collection('bikes').deleteOne({ id: req.params.id });
     
     res.json({
       success: true,
       message: 'Bike deleted successfully',
-      bike: deletedBike
+      bike: bike
     });
   } catch (error) {
     res.status(500).json({
@@ -481,10 +432,11 @@ app.get('/api/pricing/:bikeId', async (req, res) => {
     const { quantity } = req.query;
     const userEmail = req.headers.authorization?.replace('Bearer ', '');
     
-    const data = await readData();
+    // Connect to DB
+    const db = await connectToDatabase();
     
     // Find the bike
-    const bike = data.bikes.find(b => b.id === bikeId);
+    const bike = await db.collection('bikes').findOne({ id: bikeId });
     if (!bike) {
       return res.status(404).json({
         success: false,
@@ -495,8 +447,8 @@ app.get('/api/pricing/:bikeId', async (req, res) => {
     let userRole = 'customer';
     
     // Get user role if authenticated
-    if (userEmail && data.users) {
-      const user = data.users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    if (userEmail) {
+      const user = await db.collection('users').findOne({ email: userEmail });
       if (user) {
         userRole = user.role;
       }
@@ -511,7 +463,7 @@ app.get('/api/pricing/:bikeId', async (req, res) => {
 
     // Apply dealer pricing tiers
     if (userRole === 'dealer') {
-      const user = data.users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+      const user = await db.collection('users').findOne({ email: userEmail });
       if (user && user.isVerified) {
         if (qty >= 21) {
           discountPercent = 25;
@@ -587,15 +539,13 @@ app.post('/api/auth/register', async (req, res) => {
     const allowedRoles = ['customer', 'dealer', 'merchandiser', 'admin'];
     const userRole = role && allowedRoles.includes(role) ? role : 'customer';
     
-    const data = await readData();
-    
-    // Initialize users array if it doesn't exist
-    if (!data.users) {
-      data.users = [];
-    }
+    const db = await connectToDatabase();
     
     // Check if email already exists
-    const existingUser = data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const existingUser = await db.collection('users').findOne({ 
+      email: email.toLowerCase() 
+    });
+    
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -603,9 +553,12 @@ app.post('/api/auth/register', async (req, res) => {
       });
     }
     
+    // Generate new ID
+    const usersCount = await db.collection('users').countDocuments();
+    
     // Create new user
     const newUser = {
-      id: (data.users.length + 1).toString(),
+      id: (usersCount + 1).toString(),
       name,
       email: email.toLowerCase(),
       password, // In production, hash this!
@@ -614,17 +567,8 @@ app.post('/api/auth/register', async (req, res) => {
       createdAt: new Date().toISOString()
     };
     
-    data.users.push(newUser);
-    
-    // Save to file
-    const saved = await writeData(data);
-    
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error saving user to database'
-      });
-    }
+    // Save to MongoDB
+    await db.collection('users').insertOne(newUser);
     
     // Return user without password
     const { password: _, ...userWithoutPassword } = newUser;
@@ -655,17 +599,13 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
     
-    const data = await readData();
-    
-    if (!data.users) {
-      data.users = [];
-    }
+    const db = await connectToDatabase();
     
     // Find user
-    const user = data.users.find(u => 
-      u.email.toLowerCase() === email.toLowerCase() && 
-      u.password === password
-    );
+    const user = await db.collection('users').findOne({
+      email: email.toLowerCase(),
+      password: password
+    });
     
     if (!user) {
       return res.status(401).json({
@@ -701,28 +641,34 @@ app.post('/api/dealer/verify', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    const userIndex = data.users.findIndex(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    const db = await connectToDatabase();
+    
+    const user = await db.collection('users').findOne({ email: userEmail.toLowerCase() });
 
-    if (userIndex === -1) {
+    if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    if (data.users[userIndex].role !== 'dealer') {
+    if (user.role !== 'dealer') {
       return res.status(400).json({ success: false, message: 'Only dealers can submit verification' });
     }
 
     // Update user with verification data
-    data.users[userIndex].dealerInfo = {
-      businessName,
-      taxId,
-      address,
-      phone,
-      submittedAt: new Date().toISOString()
-    };
-    data.users[userIndex].verificationStatus = 'pending';
-
-    await writeData(data);
+    await db.collection('users').updateOne(
+      { email: userEmail.toLowerCase() },
+      {
+        $set: {
+          dealerInfo: {
+            businessName,
+            taxId,
+            address,
+            phone,
+            submittedAt: new Date().toISOString()
+          },
+          verificationStatus: 'pending'
+        }
+      }
+    );
 
     res.json({
       success: true,
@@ -738,17 +684,23 @@ app.post('/api/admin/verify-dealer', async (req, res) => {
   try {
     const { email, status } = req.body; // status: 'verified' or 'rejected'
     
-    const data = await readData();
-    const userIndex = data.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    const db = await connectToDatabase();
+    
+    const user = await db.collection('users').findOne({ email: email.toLowerCase() });
 
-    if (userIndex === -1) {
+    if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    data.users[userIndex].isVerified = status === 'verified';
-    data.users[userIndex].verificationStatus = status;
-
-    await writeData(data);
+    await db.collection('users').updateOne(
+      { email: email.toLowerCase() },
+      {
+        $set: {
+          isVerified: status === 'verified',
+          verificationStatus: status
+        }
+      }
+    );
 
     res.json({
       success: true,
@@ -767,20 +719,26 @@ app.put('/api/dealer/info', async (req, res) => {
 
     if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const data = await readData();
-    const userIndex = data.users.findIndex(u => u.email === userEmail);
+    const db = await connectToDatabase();
+    
+    const user = await db.collection('users').findOne({ email: userEmail });
 
-    if (userIndex === -1) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    data.users[userIndex].dealerInfo = {
-      businessName,
-      taxId,
-      address,
-      phone,
-      updatedAt: new Date().toISOString()
-    };
-
-    await writeData(data);
+    await db.collection('users').updateOne(
+      { email: userEmail },
+      {
+        $set: {
+          dealerInfo: {
+            businessName,
+            taxId,
+            address,
+            phone,
+            updatedAt: new Date().toISOString()
+          }
+        }
+      }
+    );
     res.json({ success: true, message: 'Dealer information updated' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating dealer info' });
@@ -793,10 +751,9 @@ app.get('/api/user/addresses', async (req, res) => {
     const userEmail = req.headers.authorization?.replace('Bearer ', '');
     if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const data = await readData();
-    if (!data.addresses) data.addresses = [];
+    const db = await connectToDatabase();
     
-    const userAddresses = data.addresses.filter(a => a.userEmail === userEmail);
+    const userAddresses = await db.collection('addresses').find({ userEmail }).toArray();
     res.json({ success: true, addresses: userAddresses });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching addresses' });
@@ -808,8 +765,7 @@ app.post('/api/user/addresses', async (req, res) => {
     const userEmail = req.headers.authorization?.replace('Bearer ', '');
     if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const data = await readData();
-    if (!data.addresses) data.addresses = [];
+    const db = await connectToDatabase();
 
     const newAddress = {
       ...req.body,
@@ -818,8 +774,7 @@ app.post('/api/user/addresses', async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    data.addresses.push(newAddress);
-    await writeData(data);
+    await db.collection('addresses').insertOne(newAddress);
     res.json({ success: true, address: newAddress });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error adding address' });
@@ -831,11 +786,9 @@ app.delete('/api/user/addresses/:id', async (req, res) => {
     const userEmail = req.headers.authorization?.replace('Bearer ', '');
     if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const data = await readData();
-    if (!data.addresses) data.addresses = [];
+    const db = await connectToDatabase();
 
-    data.addresses = data.addresses.filter(a => !(a.id === req.params.id && a.userEmail === userEmail));
-    await writeData(data);
+    await db.collection('addresses').deleteOne({ id: req.params.id, userEmail });
     res.json({ success: true, message: 'Address deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error deleting address' });
@@ -848,15 +801,18 @@ app.get('/api/user/reviews', async (req, res) => {
     const userEmail = req.headers.authorization?.replace('Bearer ', '');
     if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const data = await readData();
-    if (!data.reviews) data.reviews = [];
+    const db = await connectToDatabase();
 
-    const userReviews = data.reviews.filter(r => r.userEmail === userEmail).map(r => {
-      const bike = data.bikes.find(b => b.id === r.bikeId);
-      return { ...r, bikeName: bike?.name || 'Unknown Bike' };
-    });
+    const userReviews = await db.collection('reviews').find({ userEmail }).toArray();
+    
+    const reviewsWithBikes = await Promise.all(
+      userReviews.map(async (r) => {
+        const bike = await db.collection('bikes').findOne({ id: r.bikeId });
+        return { ...r, bikeName: bike?.name || 'Unknown Bike' };
+      })
+    );
 
-    res.json({ success: true, reviews: userReviews });
+    res.json({ success: true, reviews: reviewsWithBikes });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching reviews' });
   }
@@ -868,12 +824,50 @@ app.get('/api/admin/users', async (req, res) => {
     const userEmail = req.headers.authorization?.replace('Bearer ', '');
     if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const data = await readData();
-    // In a real app we would check if this user is an admin
-    const users = data.users.map(({ password, ...u }) => u);
+    const db = await connectToDatabase();
+    
+    // Get all users without passwords
+    const users = await db.collection('users').find({}, { projection: { password: 0 } }).toArray();
     res.json({ success: true, users });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching users' });
+  }
+});
+
+// Update user profile
+app.put('/api/user/profile', async (req, res) => {
+  try {
+    const { name, phone, password } = req.body;
+    const authEmail = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!authEmail) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const db = await connectToDatabase();
+    
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (phone) updateData.phone = phone; // Store phone in root or dealerInfo depending on structure, usually root for general profile
+    if (password) updateData.password = password; // In a real app, hash this!
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, message: 'No changes provided' });
+    }
+
+    const result = await db.collection('users').updateOne(
+      { email: authEmail },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ success: false, message: 'Error updating profile' });
   }
 });
 
@@ -883,17 +877,20 @@ app.post('/api/admin/users/role', async (req, res) => {
     const { email, role } = req.body;
     const adminEmail = req.headers.authorization?.replace('Bearer ', '');
     
-    const data = await readData();
-    const adminUser = data.users.find(u => u.email === adminEmail);
+    const db = await connectToDatabase();
+    
+    const adminUser = await db.collection('users').findOne({ email: adminEmail });
     if (!adminUser || adminUser.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
-    const userIndex = data.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-    if (userIndex === -1) return res.status(404).json({ success: false, message: 'User not found' });
+    const user = await db.collection('users').findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    data.users[userIndex].role = role;
-    await writeData(data);
+    await db.collection('users').updateOne(
+      { email: email.toLowerCase() },
+      { $set: { role } }
+    );
 
     res.json({ success: true, message: `Role updated to ${role}` });
   } catch (error) {
@@ -905,25 +902,29 @@ app.post('/api/admin/users/role', async (req, res) => {
 app.get('/api/admin/settings', async (req, res) => {
   try {
     const adminEmail = req.headers.authorization?.replace('Bearer ', '');
-    const data = await readData();
-    const adminUser = data.users?.find(u => u.email === adminEmail);
+    const db = await connectToDatabase();
+    
+    const adminUser = await db.collection('users').findOne({ email: adminEmail });
     
     if (!adminUser || adminUser.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
-    // Initialize settings if not present
-    if (!data.settings) {
-      data.settings = {
+    // Get or initialize settings
+    let settings = await db.collection('settings').findOne({ _id: 'app_settings' });
+    
+    if (!settings) {
+      settings = {
+        _id: 'app_settings',
         maintenanceMode: false,
         dealerAutoApproval: false
       };
-      await writeData(data);
+      await db.collection('settings').insertOne(settings);
     }
 
-    res.json({ success: true, settings: data.settings });
+    res.json({ success: true, settings: settings });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching settings' });
+    res.status(500).json({ success: false, message: 'Error fetching settings', error: error.message });
   }
 });
 
@@ -932,25 +933,28 @@ app.put('/api/admin/settings', async (req, res) => {
   try {
     const { maintenanceMode, dealerAutoApproval } = req.body;
     const adminEmail = req.headers.authorization?.replace('Bearer ', '');
-    const data = await readData();
-    const adminUser = data.users?.find(u => u.email === adminEmail);
+    const db = await connectToDatabase();
+    
+    const adminUser = await db.collection('users').findOne({ email: adminEmail });
     
     if (!adminUser || adminUser.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Admin access required' });
     }
 
-    // Initialize settings if not present
-    if (!data.settings) {
-      data.settings = {};
-    }
+    // Update settings
+    const updateFields = {};
+    if (maintenanceMode !== undefined) updateFields.maintenanceMode = maintenanceMode;
+    if (dealerAutoApproval !== undefined) updateFields.dealerAutoApproval = dealerAutoApproval;
 
-    // Update only provided fields
-    if (maintenanceMode !== undefined) data.settings.maintenanceMode = maintenanceMode;
-    if (dealerAutoApproval !== undefined) data.settings.dealerAutoApproval = dealerAutoApproval;
+    await db.collection('settings').updateOne(
+      { _id: 'app_settings' },
+      { $set: updateFields },
+      { upsert: true }
+    );
 
-    await writeData(data);
+    const settings = await db.collection('settings').findOne({ _id: 'app_settings' });
 
-    res.json({ success: true, settings: data.settings, message: 'Settings updated successfully' });
+    res.json({ success: true, settings: settings, message: 'Settings updated successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating settings' });
   }
@@ -960,20 +964,25 @@ app.put('/api/admin/settings', async (req, res) => {
 app.get('/api/admin/stats', async (req, res) => {
   try {
     const adminEmail = req.headers.authorization?.replace('Bearer ', '');
-    const data = await readData();
-    const adminUser = data.users.find(u => u.email === adminEmail);
+    const db = await connectToDatabase();
+    
+    const adminUser = await db.collection('users').findOne({ email: adminEmail });
     if (!adminUser || (adminUser.role !== 'admin' && adminUser.role !== 'merchandiser')) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const totalSales = (data.orders || []).reduce((sum, o) => sum + o.total, 0);
-    const totalOrders = (data.orders || []).length;
-    const totalUsers = data.users.length;
-    const totalBikes = data.bikes.length;
-    const totalInventory = data.bikes.reduce((sum, b) => sum + b.stock, 0);
+    const orders = await db.collection('orders').find({}).toArray();
+    const users = await db.collection('users').find({}).toArray();
+    const bikes = await db.collection('bikes').find({}).toArray();
+
+    const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
+    const totalOrders = orders.length;
+    const totalUsers = users.length;
+    const totalBikes = bikes.length;
+    const totalInventory = bikes.reduce((sum, b) => sum + b.stock, 0);
 
     // Group sales by day
-    const salesByDay = (data.orders || []).reduce((acc, o) => {
+    const salesByDay = orders.reduce((acc, o) => {
       const date = o.createdAt.split('T')[0];
       acc[date] = (acc[date] || 0) + o.total;
       return acc;
@@ -1001,8 +1010,10 @@ app.post('/api/bikes/bulk', async (req, res) => {
     const bikes = req.body; // Expecting an array
     if (!Array.isArray(bikes)) return res.status(400).json({ success: false, message: 'Expected an array of bikes' });
 
-    const data = await readData();
-    let maxId = data.bikes.length > 0 ? Math.max(...data.bikes.map(b => parseInt(b.id))) : 0;
+    const db = await connectToDatabase();
+    
+    const allBikes = await db.collection('bikes').find({}).toArray();
+    let maxId = allBikes.length > 0 ? Math.max(...allBikes.map(b => parseInt(b.id))) : 0;
 
     const newBikes = bikes.map(b => {
       maxId++;
@@ -1015,8 +1026,7 @@ app.post('/api/bikes/bulk', async (req, res) => {
       };
     });
 
-    data.bikes.push(...newBikes);
-    await writeData(data);
+    await db.collection('bikes').insertMany(newBikes);
 
     res.json({ success: true, message: `Successfully uploaded ${newBikes.length} bikes` });
   } catch (error) {
@@ -1040,27 +1050,27 @@ app.get('/api/cart', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.cart) {
-      data.cart = [];
-    }
+    const db = await connectToDatabase();
 
     // Get user's cart items
-    const userCartItems = data.cart.filter(item => item.userEmail === userEmail);
+    const userCartItems = await db.collection('cart').find({ userEmail }).toArray();
     
     // Populate with bike details
-    const cartItemsWithDetails = userCartItems.map(cartItem => {
-      const bike = data.bikes.find(b => b.id === cartItem.bikeId);
-      return {
-        ...cartItem,
-        bike
-      };
-    }).filter(item => item.bike); // Filter out items where bike doesn't exist
+    const cartItemsWithDetails = await Promise.all(
+      userCartItems.map(async (cartItem) => {
+        const bike = await db.collection('bikes').findOne({ id: cartItem.bikeId });
+        return {
+          ...cartItem,
+          bike
+        };
+      })
+    );
+    
+    const validCartItems = cartItemsWithDetails.filter(item => item.bike);
 
     res.json({
       success: true,
-      cartItems: cartItemsWithDetails
+      cartItems: validCartItems
     });
   } catch (error) {
     res.status(500).json({
@@ -1091,14 +1101,10 @@ app.post('/api/cart/add', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.cart) {
-      data.cart = [];
-    }
+    const db = await connectToDatabase();
 
     // Check if bike exists
-    const bike = data.bikes.find(b => b.id === bikeId);
+    const bike = await db.collection('bikes').findOne({ id: bikeId });
     if (!bike) {
       return res.status(404).json({
         success: false,
@@ -1107,34 +1113,34 @@ app.post('/api/cart/add', async (req, res) => {
     }
 
     // Check if item already in cart
-    const existingItemIndex = data.cart.findIndex(
-      item => item.userEmail === authEmail && item.bikeId === bikeId
-    );
+    const existingItem = await db.collection('cart').findOne({
+      userEmail: authEmail,
+      bikeId: bikeId
+    });
 
-    if (existingItemIndex !== -1) {
+    if (existingItem) {
       // Update quantity
-      data.cart[existingItemIndex].quantity += quantity;
-      data.cart[existingItemIndex].updatedAt = new Date().toISOString();
+      await db.collection('cart').updateOne(
+        { _id: existingItem._id },
+        { 
+          $set: { 
+            quantity: existingItem.quantity + quantity,
+            updatedAt: new Date().toISOString()
+          }
+        }
+      );
     } else {
       // Add new cart item
+      const cartCount = await db.collection('cart').countDocuments();
       const newCartItem = {
-        id: (data.cart.length + 1).toString(),
+        id: (cartCount + 1).toString(),
         userEmail: authEmail,
         bikeId,
         quantity,
         addedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      data.cart.push(newCartItem);
-    }
-
-    const saved = await writeData(data);
-
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error saving to cart'
-      });
+      await db.collection('cart').insertOne(newCartItem);
     }
 
     res.json({
@@ -1147,105 +1153,6 @@ app.post('/api/cart/add', async (req, res) => {
       message: 'Error adding to cart',
       error: error.message
     });
-  }
-});
-
-// Admin: Get all users
-app.get('/api/admin/users', async (req, res) => {
-  try {
-    const data = await readData();
-    res.json({
-      success: true,
-      users: data.users.map(({ password, ...u }) => u)
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching users', error: error.message });
-  }
-});
-
-// Update Dealer Info
-app.put('/api/dealer/info', async (req, res) => {
-  try {
-    const { dealerInfo } = req.body;
-    const userEmail = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!userEmail) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-
-    const data = await readData();
-    const userIndex = data.users.findIndex(u => u.email === userEmail);
-
-    if (userIndex === -1) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    data.users[userIndex].dealerInfo = {
-      ...data.users[userIndex].dealerInfo,
-      ...dealerInfo
-    };
-
-    await writeData(data);
-    res.json({ success: true, message: 'Dealer information updated successfully', user: data.users[userIndex] });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error updating dealer info', error: error.message });
-  }
-});
-
-// --- ADDRESSES ---
-app.get('/api/user/addresses', async (req, res) => {
-  try {
-    const userEmail = req.headers.authorization?.replace('Bearer ', '');
-    if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
-
-    const data = await readData();
-    const userAddresses = (data.addresses || []).filter(a => a.userEmail === userEmail);
-    res.json({ success: true, addresses: userAddresses });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error fetching addresses', error: error.message });
-  }
-});
-
-app.post('/api/user/addresses', async (req, res) => {
-  try {
-    const { address } = req.body;
-    const userEmail = req.headers.authorization?.replace('Bearer ', '');
-    if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
-
-    const data = await readData();
-    if (!data.addresses) data.addresses = [];
-
-    const newAddress = {
-      ...address,
-      id: Date.now().toString(),
-      userEmail
-    };
-
-    data.addresses.push(newAddress);
-    await writeData(data);
-    res.status(201).json({ success: true, address: newAddress });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error saving address', error: error.message });
-  }
-});
-
-app.delete('/api/user/addresses/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userEmail = req.headers.authorization?.replace('Bearer ', '');
-    if (!userEmail) return res.status(401).json({ success: false, message: 'Unauthorized' });
-
-    const data = await readData();
-    if (!data.addresses) data.addresses = [];
-
-    const index = data.addresses.findIndex(a => a.id === id && a.userEmail === userEmail);
-    if (index === -1) return res.status(404).json({ success: false, message: 'Address not found' });
-
-    data.addresses.splice(index, 1);
-    await writeData(data);
-    res.json({ success: true, message: 'Address deleted' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error deleting address', error: error.message });
   }
 });
 
@@ -1270,34 +1177,29 @@ app.put('/api/cart/update/:bikeId', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.cart) {
-      data.cart = [];
-    }
+    const db = await connectToDatabase();
 
-    const cartItemIndex = data.cart.findIndex(
-      item => item.userEmail === userEmail && item.bikeId === bikeId
-    );
+    const cartItem = await db.collection('cart').findOne({
+      userEmail,
+      bikeId
+    });
 
-    if (cartItemIndex === -1) {
+    if (!cartItem) {
       return res.status(404).json({
         success: false,
         message: 'Cart item not found'
       });
     }
 
-    data.cart[cartItemIndex].quantity = quantity;
-    data.cart[cartItemIndex].updatedAt = new Date().toISOString();
-
-    const saved = await writeData(data);
-
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error updating cart'
-      });
-    }
+    await db.collection('cart').updateOne(
+      { _id: cartItem._id },
+      { 
+        $set: { 
+          quantity: quantity,
+          updatedAt: new Date().toISOString()
+        }
+      }
+    );
 
     res.json({
       success: true,
@@ -1325,30 +1227,17 @@ app.delete('/api/cart/remove/:bikeId', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.cart) {
-      data.cart = [];
-    }
+    const db = await connectToDatabase();
 
-    const initialLength = data.cart.length;
-    data.cart = data.cart.filter(
-      item => !(item.userEmail === userEmail && item.bikeId === bikeId)
-    );
+    const result = await db.collection('cart').deleteOne({
+      userEmail,
+      bikeId
+    });
 
-    if (data.cart.length === initialLength) {
+    if (result.deletedCount === 0) {
       return res.status(404).json({
         success: false,
         message: 'Cart item not found'
-      });
-    }
-
-    const saved = await writeData(data);
-
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error removing from cart'
       });
     }
 
@@ -1377,22 +1266,9 @@ app.delete('/api/cart/clear', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.cart) {
-      data.cart = [];
-    }
+    const db = await connectToDatabase();
 
-    data.cart = data.cart.filter(item => item.userEmail !== userEmail);
-
-    const saved = await writeData(data);
-
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error clearing cart'
-      });
-    }
+    await db.collection('cart').deleteMany({ userEmail });
 
     res.json({
       success: true,
@@ -1420,18 +1296,20 @@ app.get('/api/wishlist', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    if (!data.wishlist) data.wishlist = [];
+    const db = await connectToDatabase();
 
-    const userWishlist = data.wishlist
-      .filter(item => item.userEmail === userEmail)
-      .map(item => {
-        const bike = data.bikes.find(b => b.id === item.bikeId);
+    const userWishlist = await db.collection('wishlist').find({ userEmail }).toArray();
+    
+    const wishlistWithBikes = await Promise.all(
+      userWishlist.map(async (item) => {
+        const bike = await db.collection('bikes').findOne({ id: item.bikeId });
         return { ...item, bike };
       })
-      .filter(item => item.bike); // Only return items where bike exists
+    );
+    
+    const validWishlist = wishlistWithBikes.filter(item => item.bike);
 
-    res.json({ success: true, wishlist: userWishlist });
+    res.json({ success: true, wishlist: validWishlist });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching wishlist', error: error.message });
   }
@@ -1447,25 +1325,24 @@ app.post('/api/wishlist/add', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    if (!data.wishlist) data.wishlist = [];
+    const db = await connectToDatabase();
 
     // Check if already in wishlist
-    const exists = data.wishlist.find(item => item.userEmail === userEmail && item.bikeId === bikeId);
+    const exists = await db.collection('wishlist').findOne({ userEmail, bikeId });
     
     if (exists) {
       return res.json({ success: true, message: 'Already in wishlist' });
     }
 
+    const wishlistCount = await db.collection('wishlist').countDocuments();
     const newItem = {
-      id: (data.wishlist.length + 1).toString(),
+      id: (wishlistCount + 1).toString(),
       userEmail,
       bikeId,
       createdAt: new Date().toISOString()
     };
 
-    data.wishlist.push(newItem);
-    await writeData(data);
+    await db.collection('wishlist').insertOne(newItem);
 
     res.status(201).json({ success: true, message: 'Added to wishlist', item: newItem });
   } catch (error) {
@@ -1483,11 +1360,9 @@ app.delete('/api/wishlist/remove/:bikeId', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    if (!data.wishlist) data.wishlist = [];
+    const db = await connectToDatabase();
 
-    data.wishlist = data.wishlist.filter(item => !(item.userEmail === userEmail && item.bikeId === bikeId));
-    await writeData(data);
+    await db.collection('wishlist').deleteOne({ userEmail, bikeId });
 
     res.json({ success: true, message: 'Removed from wishlist' });
   } catch (error) {
@@ -1503,10 +1378,9 @@ app.delete('/api/wishlist/remove/:bikeId', async (req, res) => {
 app.get('/api/reviews/:bikeId', async (req, res) => {
   try {
     const { bikeId } = req.params;
-    const data = await readData();
-    if (!data.reviews) data.reviews = [];
+    const db = await connectToDatabase();
 
-    const bikeReviews = data.reviews.filter(r => r.bikeId === bikeId);
+    const bikeReviews = await db.collection('reviews').find({ bikeId }).toArray();
     
     // Calculate average rating
     const totalRating = bikeReviews.reduce((sum, r) => sum + r.rating, 0);
@@ -1539,13 +1413,12 @@ app.post('/api/reviews/add', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Rating must be between 1 and 5' });
     }
 
-    const data = await readData();
-    if (!data.reviews) data.reviews = [];
+    const db = await connectToDatabase();
 
-    const user = data.users.find(u => u.email === userEmail);
+    const user = await db.collection('users').findOne({ email: userEmail });
     
     const newReview = {
-      id: (data.reviews.length + 1).toString(),
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       bikeId,
       userEmail,
       userName: user ? user.name : userEmail.split('@')[0],
@@ -1555,17 +1428,17 @@ app.post('/api/reviews/add', async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    data.reviews.push(newReview);
+    await db.collection('reviews').insertOne(newReview);
     
-    // Update bike's rating and reviews count (if we want to cache it)
-    const bikeIndex = data.bikes.findIndex(b => b.id === bikeId);
-    if (bikeIndex !== -1) {
-      const bikeReviews = data.reviews.filter(r => r.bikeId === bikeId);
-      const totalRating = bikeReviews.reduce((sum, r) => sum + r.rating, 0);
-      data.bikes[bikeIndex].rating = parseFloat((totalRating / bikeReviews.length).toFixed(1));
-    }
-
-    await writeData(data);
+    // Update bike's rating and reviews count
+    const bikeReviews = await db.collection('reviews').find({ bikeId }).toArray();
+    const totalRating = bikeReviews.reduce((sum, r) => sum + r.rating, 0);
+    const avgRating = parseFloat((totalRating / bikeReviews.length).toFixed(1));
+    
+    await db.collection('bikes').updateOne(
+      { id: bikeId },
+      { $set: { rating: avgRating } }
+    );
 
     res.status(201).json({ success: true, message: 'Review added successfully', review: newReview });
   } catch (error) {
@@ -1583,15 +1456,26 @@ app.delete('/api/reviews/:id', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    const reviewIndex = data.reviews.findIndex(r => r.id === id);
+    const db = await connectToDatabase();
     
-    if (reviewIndex === -1) {
+    // Check both custom ID and potential ObjectId
+    let review = await db.collection('reviews').findOne({ id });
+    
+    if (!review) {
+      // Try finding by ObjectId if not found by string ID
+      try {
+        const { ObjectId } = require('mongodb');
+        review = await db.collection('reviews').findOne({ _id: new ObjectId(id) });
+      } catch (e) {
+        // ID is not a valid ObjectId, ignore
+      }
+    }
+    
+    if (!review) {
       return res.status(404).json({ success: false, message: 'Review not found' });
     }
 
-    const user = data.users.find(u => u.email === userEmail);
-    const review = data.reviews[reviewIndex];
+    const user = await db.collection('users').findOne({ email: userEmail });
 
     // Authorization: Admin, Merchandiser, or Review Owner
     const isOwner = review.userEmail === userEmail;
@@ -1602,33 +1486,66 @@ app.delete('/api/reviews/:id', async (req, res) => {
     }
 
     const bikeId = review.bikeId;
-    data.reviews.splice(reviewIndex, 1);
+    await db.collection('reviews').deleteOne({ _id: review._id });
 
     // Re-calculate bike's rating
-    const bikeIndex = data.bikes.findIndex(b => b.id === bikeId);
-    if (bikeIndex !== -1) {
-      const bikeReviews = data.reviews.filter(r => r.bikeId === bikeId);
-      if (bikeReviews.length > 0) {
-        const totalRating = bikeReviews.reduce((sum, r) => sum + r.rating, 0);
-        data.bikes[bikeIndex].rating = parseFloat((totalRating / bikeReviews.length).toFixed(1));
-      } else {
-        data.bikes[bikeIndex].rating = 0;
-      }
+    const bikeReviews = await db.collection('reviews').find({ bikeId }).toArray();
+    if (bikeReviews.length > 0) {
+      const totalRating = bikeReviews.reduce((sum, r) => sum + r.rating, 0);
+      const avgRating = parseFloat((totalRating / bikeReviews.length).toFixed(1));
+      await db.collection('bikes').updateOne(
+        { id: bikeId },
+        { $set: { rating: avgRating } }
+      );
+    } else {
+      await db.collection('bikes').updateOne(
+        { id: bikeId },
+        { $set: { rating: 0 } }
+      );
     }
-
-    await writeData(data);
     res.json({ success: true, message: 'Review deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error deleting review', error: error.message });
   }
 });
 
+// Get active promos (public - for PromoSlider)
+app.get('/api/promos/active', async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    
+    // Fetch only active and non-expired promos
+    const promos = await db.collection('promos').find({
+      active: true,
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    }).toArray();
+    
+    // Return only necessary fields for public display
+    const publicPromos = promos.map(promo => ({
+      code: promo.code,
+      type: promo.type,
+      discount: promo.discount,
+      description: promo.description
+    }));
+    
+    res.json({ success: true, promos: publicPromos });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching active promos' });
+  }
+});
+
 app.get('/api/promos', async (req, res) => {
   try {
-    const data = await readData();
+    const db = await connectToDatabase();
+    
+    const promos = await db.collection('promos').find({}).toArray();
+    
     res.json({
       success: true,
-      promos: data.promos || []
+      promos: promos
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching promos' });
@@ -1646,16 +1563,15 @@ app.post('/api/admin/promos', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const data = await readData();
-    if (!data.promos) data.promos = [];
+    const db = await connectToDatabase();
 
-    if (data.promos.find(p => p.code === code)) {
+    const existingPromo = await db.collection('promos').findOne({ code });
+    if (existingPromo) {
       return res.status(400).json({ success: false, message: 'Promo code already exists' });
     }
 
     const newPromo = { code, discount, type, description, expiresAt };
-    data.promos.push(newPromo);
-    await writeData(data);
+    await db.collection('promos').insertOne(newPromo);
 
     res.json({ success: true, message: 'Promo created', promo: newPromo });
   } catch (error) {
@@ -1667,35 +1583,34 @@ app.put('/api/admin/promos/:code', async (req, res) => {
   try {
     const { code } = req.params;
     const updates = req.body;
-    const data = await readData();
+    const db = await connectToDatabase();
     
-    const index = data.promos.findIndex(p => p.code === code);
-    if (index === -1) {
+    const promo = await db.collection('promos').findOne({ code });
+    if (!promo) {
       return res.status(404).json({ success: false, message: 'Promo not found' });
     }
 
-    data.promos[index] = { ...data.promos[index], ...updates };
-    await writeData(data);
+    const updatedPromo = { ...promo, ...updates };
+    await db.collection('promos').updateOne(
+      { code },
+      { $set: updatedPromo }
+    );
 
-    res.json({ success: true, message: 'Promo updated', promo: data.promos[index] });
+    res.json({ success: true, message: 'Promo updated', promo: updatedPromo });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error updating promo' });
+    res.status(500).json({ success: false, message: 'Error updating promo', error: error.message });
   }
 });
 
 app.delete('/api/admin/promos/:code', async (req, res) => {
   try {
     const { code } = req.params;
-    const data = await readData();
+    const db = await connectToDatabase();
     
-    const initialLength = data.promos.length;
-    data.promos = data.promos.filter(p => p.code !== code);
-    
-    if (data.promos.length === initialLength) {
+    const result = await db.collection('promos').deleteOne({ code });
+    if (result.deletedCount === 0) {
       return res.status(404).json({ success: false, message: 'Promo not found' });
     }
-
-    await writeData(data);
     res.json({ success: true, message: 'Promo deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error deleting promo' });
@@ -1705,16 +1620,14 @@ app.delete('/api/admin/promos/:code', async (req, res) => {
 app.post('/api/promos/validate', async (req, res) => {
   try {
     const { code } = req.body;
-    const data = await readData();
+    const db = await connectToDatabase();
     
-    if (!data.promos) {
-      return res.status(404).json({ success: false, message: 'Promo codes not found' });
-    }
-
-    const promo = data.promos.find(p => p.code.toUpperCase() === code.toUpperCase());
+    const promo = await db.collection('promos').findOne({ 
+      code: { $regex: new RegExp(`^${code}$`, 'i') }
+    });
 
     if (!promo) {
-      return res.status(404).json({ success: false, message: 'Invalid promo code' });
+      return res.status(400).json({ success: false, message: 'Invalid promo code' });
     }
 
     // Check expiration
@@ -1731,73 +1644,18 @@ app.post('/api/promos/validate', async (req, res) => {
   }
 });
 
-// ============================================
-// PAYMENT ROUTES (STRIPE)
-// ============================================
-
-app.post('/api/create-payment-intent', async (req, res) => {
-  try {
-    const { items, userEmail } = req.body;
-    console.log("Creating payment intent for:", userEmail, items);
-    
-    const data = await readData();
-    
-    // Calculate total on server for security
-    let subtotal = 0;
-    for (const item of items) {
-      const bike = data.bikes.find(b => b.id === item.id);
-      if (bike) {
-        subtotal += bike.price * item.quantity;
-      }
-    }
-
-    const tax = subtotal * 0.1;
-    const shipping = 500;
-    const total = subtotal + tax + shipping;
-
-    console.log(`Calculated total: ${total} (Sub: ${subtotal}, Tax: ${tax}, Ship: ${shipping})`);
-
-    // Mock Mode Fallback for testing without a real Stripe key
-    const isMock = !STRIPE_SECRET_KEY || STRIPE_SECRET_KEY.includes('PLACEHOLDER');
-    
-    if (isMock) {
-      console.log("USING MOCK PAYMENT INTENT (Invalid/Placeholder Key detected)");
-      return res.json({
-        success: true,
-        clientSecret: "pi_mock_secret_" + Math.random().toString(36).substring(7),
-        isMock: true
-      });
-    }
-
-    // Create a PaymentIntent with the order amount and currency
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(total * 100), // Stripe expects cents
-      currency: "usd",
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      metadata: {
-        userEmail,
-        orderTotal: total.toString()
-      }
-    });
-
-    res.json({
-      success: true,
-      clientSecret: paymentIntent.client_secret,
-    });
-  } catch (error) {
-    console.error("STRIPE ERROR:", error);
-    res.status(500).json({ success: false, message: 'Error creating payment intent', error: error.message });
-  }
-});
+// Duplicate route removed (1/2)
 
 // ============================================
 // ORDERS ROUTES
 // ============================================
 
+// ============================================
+// Duplicate route removed (2/2)
+
 // Create new order
 app.post('/api/orders/create', async (req, res) => {
+
   try {
     const { 
       userEmail, 
@@ -1834,22 +1692,22 @@ app.post('/api/orders/create', async (req, res) => {
        paymentStatus = 'pending'; // COD is pending
     }
 
-    const data = await readData();
-    if (!data.orders) data.orders = [];
+    const db = await connectToDatabase();
 
     // Generate order number
-    const orderNumber = `ORD-${new Date().getFullYear()}-${String(data.orders.length + 1).padStart(5, '0')}`;
+    const orderCount = await db.collection('orders').countDocuments();
+    const orderNumber = `ORD-${new Date().getFullYear()}-${String(orderCount + 1).padStart(5, '0')}`;
 
     // Create new order
     const newOrder = {
-      id: (data.orders.length + 1).toString(),
+      id: (orderCount + 1).toString(),
       orderNumber,
       userEmail: authEmail,
       items,
       shippingAddress,
       paymentMethod,
       paymentStatus, 
-      status: 'confirmed', // Order is confirmed placed, payment pending for COD
+      status: 'confirmed',
       subtotal,
       tax,
       shipping,
@@ -1860,36 +1718,22 @@ app.post('/api/orders/create', async (req, res) => {
         { status: 'placed', label: 'Order Placed', timestamp: new Date().toISOString(), completed: true }
       ],
       createdAt: new Date().toISOString(),
-      estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+      estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     };
 
-    data.orders.push(newOrder);
+    await db.collection('orders').insertOne(newOrder);
 
     // Clear user's cart after order
-    if (data.cart) {
-      data.cart = data.cart.filter(item => item.userEmail !== authEmail);
-    }
+    await db.collection('cart').deleteMany({ userEmail: authEmail });
 
-    const saved = await writeData(data);
-
-    if (saved) {
-      // Send confirmation email
-      const emailHeader = paymentMethod === 'cod' ? 'Order Invoice (COD)' : 'Order Invoice & Confirmation';
-      const emailHtml = generateOrderEmail(newOrder);
-      sendEmail(
-        authEmail, 
-        `${emailHeader} - #${orderNumber}`, 
-        emailHtml
-      );
-    }
-
-
-    if (!saved) {
-      return res.status(500).json({
-        success: false,
-        message: 'Error creating order'
-      });
-    }
+    // Send confirmation email
+    const emailHeader = paymentMethod === 'cod' ? 'Order Invoice (COD)' : 'Order Invoice & Confirmation';
+    const emailHtml = generateOrderEmail(newOrder);
+    sendEmail(
+      authEmail, 
+      `${emailHeader} - #${orderNumber}`, 
+      emailHtml
+    );
 
     res.status(201).json({
       success: true,
@@ -1917,16 +1761,12 @@ app.get('/api/orders', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.orders) {
-      data.orders = [];
-    }
+    const db = await connectToDatabase();
 
-    const userOrders = data.orders.filter(order => order.userEmail === userEmail);
-    
-    // Sort by most recent first
-    userOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const userOrders = await db.collection('orders')
+      .find({ userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
 
     res.json({
       success: true,
@@ -1954,13 +1794,9 @@ app.get('/api/orders/:orderNumber', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.orders) {
-      data.orders = [];
-    }
+    const db = await connectToDatabase();
 
-    const order = data.orders.find(o => o.orderNumber === orderNumber);
+    const order = await db.collection('orders').findOne({ orderNumber });
 
     if (!order) {
       return res.status(404).json({
@@ -2011,20 +1847,19 @@ app.post('/api/orders/status/:orderNumber', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    const orderIndex = data.orders.findIndex(o => o.orderNumber === orderNumber);
+    const db = await connectToDatabase();
+    
+    const order = await db.collection('orders').findOne({ orderNumber });
 
-    if (orderIndex === -1) {
+    if (!order) {
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
 
-    const order = data.orders[orderIndex];
-
     // Basic authorization: only owner can cancel, admin can change any status
-    const user = data.users.find(u => u.email === userEmail);
+    const user = await db.collection('users').findOne({ email: userEmail });
     const isAdmin = user && user.role === 'admin';
 
     if (order.userEmail !== userEmail && !isAdmin) {
@@ -2045,10 +1880,15 @@ app.post('/api/orders/status/:orderNumber', async (req, res) => {
     }
 
     // Update status
-    data.orders[orderIndex].status = status;
-    data.orders[orderIndex].updatedAt = new Date().toISOString();
-
-    await writeData(data);
+    await db.collection('orders').updateOne(
+      { orderNumber },
+      { 
+        $set: { 
+          status,
+          updatedAt: new Date().toISOString()
+        }
+      }
+    );
 
     // Send status update email
     sendEmail(
@@ -2081,8 +1921,8 @@ app.post('/api/orders/:orderNumber/email', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    const order = data.orders.find(o => o.orderNumber === orderNumber);
+    const db = await connectToDatabase();
+    const order = await db.collection('orders').findOne({ orderNumber });
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
@@ -2125,14 +1965,13 @@ app.get('/api/admin/orders', async (req, res) => {
       });
     }
 
-    const data = await readData();
-    
-    if (!data.orders) {
-      data.orders = [];
-    }
+    const db = await connectToDatabase();
 
-    // Sort by most recent first
-    const allOrders = [...data.orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    // Get all orders sorted by most recent first
+    const allOrders = await db.collection('orders')
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
 
     res.json({
       success: true,
@@ -2159,9 +1998,10 @@ app.post('/api/quotes', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
+    const db = await connectToDatabase();
+
     const subtotal = items.reduce((sum, item) => sum + (item.bike.price * item.quantity), 0);
-    const tax = subtotal * 0.1; // 10% tax
+    const tax = subtotal * 0.1;
     const shipping = 0; 
     const total = subtotal + tax + shipping;
 
@@ -2179,12 +2019,10 @@ app.post('/api/quotes', async (req, res) => {
       dealerInfo,
       status: 'generated',
       createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     };
 
-    if (!data.quotes) data.quotes = [];
-    data.quotes.push(newQuote);
-    await writeData(data);
+    await db.collection('quotes').insertOne(newQuote);
 
     // Send Quote Email
     sendEmail(
@@ -2212,11 +2050,12 @@ app.get('/api/quotes/my-quotes', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const data = await readData();
-    const userQuotes = (data.quotes || []).filter(q => q.userEmail === userEmail);
+    const db = await connectToDatabase();
     
-    // Sort by recent
-    userQuotes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const userQuotes = await db.collection('quotes')
+      .find({ userEmail })
+      .sort({ createdAt: -1 })
+      .toArray();
 
     res.json({
       success: true,
@@ -2224,6 +2063,210 @@ app.get('/api/quotes/my-quotes', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching quotes' });
+  }
+});
+
+// ============================================
+// STRIPE PAYMENT ROUTES
+// ============================================
+
+// Create Payment Intent for Checkout
+app.post('/api/create-payment-intent', async (req, res) => {
+  try {
+    const { items, userEmail } = req.body;
+    const authEmail = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!authEmail || authEmail !== userEmail) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'No items provided' });
+    }
+
+    const db = await connectToDatabase();
+
+    // Calculate total from items
+    let total = 0;
+    for (const item of items) {
+      const bike = await db.collection('bikes').findOne({ id: item.bikeId });
+      if (bike) {
+        total += bike.price * item.quantity;
+      }
+    }
+
+    // Add tax and shipping
+    const tax = total * 0.1;
+    const shipping = 500;
+    const finalAmount = Math.round((total + tax + shipping) * 100); // Convert to cents
+
+    // Check if using real Stripe or mock mode
+    // Use mock mode if: env var is set, key is placeholder, or key doesn't exist
+    const isMock = process.env.STRIPE_MOCK_MODE === 'true' || 
+                   !STRIPE_SECRET_KEY || 
+                   STRIPE_SECRET_KEY.includes('PLACEHOLDER') || 
+                   STRIPE_SECRET_KEY.includes('sk_test_51O');
+    
+    if (isMock) {
+      // Mock mode - return mock client secret
+      return res.json({
+        success: true,
+        clientSecret: `pi_mock_${Date.now()}_secret_${Math.random().toString(36).substr(2, 9)}`,
+        isMock: true,
+        message: 'Using mock payment mode'
+      });
+    }
+
+    // Real Stripe mode - create actual payment intent
+    console.log('Creating Stripe Payment Intent with amount:', finalAmount);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: finalAmount,
+      currency: 'usd',
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      metadata: {
+        userEmail,
+        orderType: 'bike_purchase'
+      }
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      isMock: false
+    });
+
+  } catch (error) {
+    console.error('Payment Intent Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating payment intent',
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// PROMO CODE ROUTES
+// ============================================
+
+// Validate Promo Code
+app.post('/api/promos/validate', async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Promo code is required'
+      });
+    }
+
+    const db = await connectToDatabase();
+    
+   // Find promo code (case-insensitive)
+    const promo = await db.collection('promos').findOne({ 
+      code: new RegExp(`^${code}$`, 'i') 
+    });
+
+    if (!promo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid promo code'
+      });
+    }
+
+    // Check if promo is active
+    if (!promo.active) {
+      return res.status(400).json({
+        success: false,
+        message: 'This promo code is no longer active'
+      });
+    }
+
+    // Check expiration
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: 'This promo code has expired'
+      });
+    }
+
+    // Check usage limit
+    if (promo.maxUses && promo.usedCount >= promo.maxUses) {
+      return res.status(400).json({
+        success: false,
+        message: 'This promo code has reached its usage limit'
+      });
+    }
+
+    res.json({
+      success: true,
+      promo: {
+        code: promo.code,
+        type: promo.type,
+        discount: promo.discount,
+        description: promo.description
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error validating promo code',
+      error: error.message
+    });
+  }
+});
+
+// Get active promos (public - for PromoSlider)
+app.get('/api/promos/active', async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    
+    // Fetch only active and non-expired promos
+    const promos = await db.collection('promos').find({
+      active: true,
+      $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: { $gt: new Date() } }
+      ]
+    }).toArray();
+    
+    // Return only necessary fields for public display
+    const publicPromos = promos.map(promo => ({
+      code: promo.code,
+      type: promo.type,
+      discount: promo.discount,
+      description: promo.description
+    }));
+    
+    res.json({ success: true, promos: publicPromos });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching active promos' });
+  }
+});
+
+// Get all promos (admin only)
+app.get('/api/promos', async (req, res) => {
+  try {
+    const userEmail = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!userEmail) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const db = await connectToDatabase();
+    const user = await db.collection('users').findOne({ email: userEmail });
+
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Admin access required' });
+    }
+
+    const promos = await db.collection('promos').find({}).toArray();
+    res.json({ success: true, promos });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching promos' });
   }
 });
 

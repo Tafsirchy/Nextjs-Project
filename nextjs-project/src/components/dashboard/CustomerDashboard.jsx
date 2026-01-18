@@ -235,7 +235,8 @@ export default function CustomerDashboard({ user }) {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="mb-8 flex overflow-x-auto pb-2 gap-4 border-b">
+      <div className="mb-8 relative">
+        <div className="flex overflow-x-auto pb-2 gap-2 md:gap-4 border-b scrollbar-hide snap-x snap-mandatory">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -250,12 +251,14 @@ export default function CustomerDashboard({ user }) {
             {tab.label}
           </button>
         ))}
+        </div>
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white pointer-events-none md:hidden" />
       </div>
 
       {activeTab === 'overview' && (
         <div className="space-y-8">
           {/* Stats Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <Card className="border-0 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -305,7 +308,7 @@ export default function CustomerDashboard({ user }) {
             </Card>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
+          <div className="grid lg:grid-cols-3 gap-6 md:gap-8">
             <div className="lg:col-span-2">
               <Card className="border-0 shadow-sm">
                 <CardHeader className="bg-white border-b">
@@ -496,7 +499,7 @@ export default function CustomerDashboard({ user }) {
                <Link href="/bikes"><Button className="mt-4">Browse Bikes</Button></Link>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {wishlist.map(item => (
                 <BikeCard 
                   key={item.id} 
@@ -522,7 +525,7 @@ export default function CustomerDashboard({ user }) {
 
           {showAddAddressModal && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-               <Card className="w-full max-w-lg border-0 shadow-2xl animate-in fade-in zoom-in duration-200">
+               <Card className="w-full max-w-lg border-0 shadow-2xl animate-in fade-in zoom-in duration-200 bg-white">
                   <CardHeader className="flex flex-row items-center justify-between border-b">
                      <CardTitle>Add New Shipping Address</CardTitle>
                      <Button variant="ghost" size="sm" onClick={() => setShowAddAddressModal(false)}><X className="h-4 w-4" /></Button>

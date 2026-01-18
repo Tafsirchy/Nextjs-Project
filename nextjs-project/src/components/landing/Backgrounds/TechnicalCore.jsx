@@ -18,7 +18,7 @@ export default function TechnicalCore({
   }, []);
 
   return (
-    <div className={`relative pointer-events-none select-none ${className}`} style={{ width: size, height: size }}>
+    <div className={`relative pointer-events-none select-none max-w-full ${className}`} style={{ '--size': size }}>
       {/* Outer Glow / Pulse Environment */}
       <motion.div 
         animate={{ 
@@ -29,8 +29,8 @@ export default function TechnicalCore({
         className={`absolute inset-0 bg-${color}/10 rounded-full blur-[60px] opacity-20`}
       />
 
-      {/* Schematic Core */}
-      <svg viewBox="0 0 200 200" className={`w-full h-full text-${color}`}>
+       {/* Schematic Core */}
+       <svg viewBox="0 0 200 200" className={`w-full h-full max-w-full text-${color}`} preserveAspectRatio="xMidYMid meet">
          <g opacity={opacity}>
             <motion.circle 
               cx="100" cy="100" r="90" 

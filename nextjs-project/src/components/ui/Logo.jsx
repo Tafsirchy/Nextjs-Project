@@ -7,7 +7,7 @@ export function Logo({ className = "h-8 w-auto", showText = true }) {
   return (
     <div className={`flex items-center select-none ${className}`}>
       {/* Premium Logo Mark */}
-      <div className="relative w-14 h-14 flex items-center justify-center">
+      <div className="relative w-15 h-15 flex items-center justify-center">
         <img 
           src="/images/logo-premium.png" 
           alt="MotruBi Logo" 

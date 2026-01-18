@@ -1,6 +1,7 @@
 "use client";
 
 import { API_URL } from "@/lib/api";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 
 export default function MerchandiserDashboard({ user }) {
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalSales: 0,
     totalOrders: 0,
@@ -286,7 +288,7 @@ export default function MerchandiserDashboard({ user }) {
                   <div className="text-center py-12 text-muted-foreground">No orders recorded</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm min-w-[640px]">
                       <thead>
                         <tr className="border-b">
                           <th className="text-left py-3 font-semibold">Order ID</th>
@@ -340,7 +342,7 @@ export default function MerchandiserDashboard({ user }) {
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm min-w-[640px]">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 font-semibold">Bike</th>

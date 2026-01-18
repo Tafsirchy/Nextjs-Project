@@ -43,7 +43,7 @@ export default function Services() {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <section className="py-24 bg-black relative">
+    <section className="py-24 bg-black relative overflow-hidden">
        {/* Background Decoration - Animated Blobs */}
        <motion.div 
          animate={{ 

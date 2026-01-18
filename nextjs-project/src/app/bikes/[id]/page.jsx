@@ -301,10 +301,10 @@ export default function BikeDetailsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-3">
                 <Button 
                   size="lg" 
-                  className="flex-1 bike-gradient-alt text-white border-0 gap-2"
+                  className="w-full bike-gradient-alt text-white border-0 gap-2"
                   onClick={async () => {
                     const success = await addToCart(bike, quantity);
                     if (success) {
@@ -316,7 +316,7 @@ export default function BikeDetailsPage() {
                   <ShoppingCart className="h-5 w-5" />
                   {bike.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
                 </Button>
-                <Link href="/cart" className="flex-1">
+                <Link href="/cart" className="w-full">
                   <Button size="lg" variant="outline" className="w-full">
                     View Cart
                   </Button>

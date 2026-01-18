@@ -167,6 +167,7 @@ export default function ProfilePage() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Leave blank to keep current password"
+                    autoComplete="new-password"
                   />
               </div>
               

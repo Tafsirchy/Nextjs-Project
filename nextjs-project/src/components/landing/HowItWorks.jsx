@@ -101,7 +101,7 @@ export default function HowItWorks() {
       {/* Backmost Layer: Pure SVG Mechanical Blueprint Mastery - Ultra Subtle */}
       <motion.div 
         style={{ y: y1, willChange: "transform, opacity" }}
-        className="absolute inset-x-[-10%] top-0 bottom-0 z-0 pointer-events-none opacity-[0.05]"
+        className="absolute inset-x-0 lg:inset-x-[-10%] top-0 bottom-0 z-0 pointer-events-none opacity-[0.05]"
       >
         <MechanicalBlueprint />
       </motion.div>
@@ -125,7 +125,7 @@ export default function HowItWorks() {
       {/* Middle Layer: SVG Schematic Core - Technical Component */}
       <motion.div 
         style={{ y: y2, rotate: rotate1, willChange: "transform" }}
-        className="absolute top-1/4 left-[-10%] z-[1] pointer-events-none"
+        className="absolute top-1/4 left-0 lg:left-[-10%] z-[1] pointer-events-none hidden lg:block"
       >
         <TechnicalCore size="800px" opacity={0.06} withMatrix={true} />
       </motion.div>
@@ -138,7 +138,7 @@ export default function HowItWorks() {
           rotate: [0, 10, -10, 0]
         }}
         transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-x-[-30%] top-[-30%] h-[160%] z-[1] pointer-events-none blur-[120px]"
+        className="absolute inset-x-0 lg:inset-x-[-30%] top-0 lg:top-[-30%] h-full lg:h-[160%] z-[1] pointer-events-none blur-[120px]"
         style={{
           background: 'radial-gradient(circle at 10% 20%, rgba(var(--primary-rgb), 0.12) 0%, transparent 40%), radial-gradient(circle at 90% 80%, rgba(192, 38, 211, 0.12) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.08) 0%, transparent 60%)'
         }}
@@ -267,8 +267,8 @@ export default function HowItWorks() {
       </motion.div>
 
       {/* Background Ambience / Soft Radial Gradients */}
-      <div className="absolute top-1/4 -left-32 w-[600px] h-[600px] bg-primary/5 blur-[150px] rounded-full opacity-40" />
-      <div className="absolute bottom-1/4 -right-32 w-[600px] h-[600px] bg-purple-600/5 blur-[150px] rounded-full opacity-40" />
+      <div className="absolute top-1/4 left-0 lg:-left-32 w-[300px] lg:w-[600px] h-[300px] lg:h-[600px] bg-primary/5 blur-[150px] rounded-full opacity-40 hidden lg:block" />
+      <div className="absolute bottom-1/4 right-0 lg:-right-32 w-[300px] lg:w-[600px] h-[300px] lg:h-[600px] bg-purple-600/5 blur-[150px] rounded-full opacity-40 hidden lg:block" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[800px] bg-gradient-to-b from-transparent via-zinc-50 to-transparent pointer-events-none opacity-50" />
 
       <div className="container mx-auto px-4 relative z-10">

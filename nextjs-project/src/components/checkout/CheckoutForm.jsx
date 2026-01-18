@@ -82,49 +82,113 @@ function RealStripeCheckoutForm({ onPaymentSuccess, amount }) {
   const elements = useElements();
   const [message, setMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isElementReady, setIsElementReady] = useState(false);
+  const [elementError, setElementError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
-
-    setIsLoading(true);
-
-    const { error, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/order-confirmation`,
-      },
-      redirect: 'if_required',
-    });
-
-    if (error) {
-      if (error.type === "card_error" || error.type === "validation_error") {
-        setMessage(error.message);
-        toast.error(error.message);
-      } else {
-        setMessage("An unexpected error occurred.");
-        toast.error("Payment failed");
-      }
-    } else if (paymentIntent && paymentIntent.status === "succeeded") {
-      toast.success("Payment successful!");
-      onPaymentSuccess(paymentIntent);
+    
+    // Prevent submission if not ready
+    if (!stripe || !elements || !isElementReady) {
+      console.warn('Payment form not ready:', { stripe: !!stripe, elements: !!elements, isElementReady });
+      return;
     }
 
-    setIsLoading(false);
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/order-confirmation`,
+        },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        if (error.type === "card_error" || error.type === "validation_error") {
+          setMessage(error.message);
+          toast.error(error.message);
+        } else {
+          setMessage("An unexpected error occurred.");
+          toast.error("Payment failed");
+          console.error('Stripe payment error:', error);
+        }
+      } else if (paymentIntent && paymentIntent.status === "succeeded") {
+        toast.success("Payment successful!");
+        onPaymentSuccess(paymentIntent);
+      }
+    } catch (err) {
+      console.error('Payment submission error:', err);
+      setMessage("Failed to process payment");
+      toast.error("Payment failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Track Payment Element ready state
+  const handleElementChange = (event) => {
+    if (event.complete) {
+      setIsElementReady(true);
+      setElementError(null);
+    } else if (event.error) {
+      setElementError(event.error.message);
+      setIsElementReady(false);
+    }
   };
 
   return (
     <form id="payment-form" onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
+      <div className="relative">
+        {!stripe || !elements ? (
+          <div className="p-8 border-2 border-dashed rounded-xl bg-slate-50 space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-600 border-t-transparent"></div>
+              <span className="text-sm text-slate-600 font-medium">Loading payment form...</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            <PaymentElement 
+              id="payment-element" 
+              options={{ layout: "tabs" }}
+              onChange={handleElementChange}
+              onReady={() => {
+                console.log('Payment Element ready');
+                setIsElementReady(true);
+              }}
+              onLoadError={(error) => {
+                console.error('Payment Element load error:', error);
+                setElementError('Failed to load payment form. Please refresh the page.');
+                toast.error('Payment form failed to load');
+              }}
+            />
+            {elementError && (
+              <div className="mt-2 text-red-500 text-sm font-medium">
+                {elementError}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       <Button
-        disabled={isLoading || !stripe || !elements}
+        disabled={isLoading || !stripe || !elements || !isElementReady}
         id="submit"
-        className="w-full bike-gradient-alt text-white border-0 py-6 text-lg font-bold"
+        type="submit"
+        className="w-full bike-gradient-alt text-white border-0 py-6 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isLoading ? (
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
             Processing...
+          </div>
+        ) : !isElementReady ? (
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+            Loading...
           </div>
         ) : (
           `Pay Now ($${amount.toLocaleString()})`

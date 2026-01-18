@@ -1,7 +1,7 @@
 "use client";
 
 import { API_URL } from "@/lib/api";
-import { Edit, useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,8 @@ import {
   UserPlus,
   Trash2,
   Eye,
-  X
+  X,
+  Edit
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -56,12 +57,14 @@ export default function AdminDashboard({ user }) {
         }),
         fetch(`${API_URL}/api/admin/settings`, {
           headers: { 'Authorization': `Bearer ${user.email}` }
-        })
+        }),
+        fetch(`${API_URL}/api/bikes`)
       ]);
 
       const statsData = await statsRes.json();
       const usersData = await usersRes.json();
       const settingsData = await settingsRes.json();
+      const inventoryData = await inventoryRes.json();
 
       if (statsData.success) setStats(statsData.stats);
       if (usersData.success) {
@@ -71,6 +74,7 @@ export default function AdminDashboard({ user }) {
         setPendingDealers(pending);
       }
       if (settingsData.success) setSettings(settingsData.settings);
+      if (inventoryData.success) setInventory(inventoryData.bikes);
 
       // Fetch promos
       const promoRes = await fetch(`${API_URL}/api/promos`);
@@ -200,13 +204,17 @@ export default function AdminDashboard({ user }) {
     
     setUpdating(true);
     try {
+      // Create a copy of the bike data and remove the immutable _id field
+      const bikeUpdateData = { ...editingBike };
+      delete bikeUpdateData._id;
+
       const res = await fetch(`${API_URL}/api/bikes/${editingBike.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.email}`
         },
-        body: JSON.stringify(editingBike)
+        body: JSON.stringify(bikeUpdateData)
       });
       const data = await res.json();
       
@@ -355,12 +363,12 @@ export default function AdminDashboard({ user }) {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Platform Administration</h1>
-        <p className="text-muted-foreground">Governance hub for MotruBi e-commerce platform</p>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words">Platform Administration</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">Governance hub for MotruBi e-commerce platform</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid md:grid-cols-4 gap-6 mb-8">
+      <div className="grid md:grid-cols-4 gap-4 md:gap-6 mb-8">
          {[
            { label: "Total Revenue", value: `$${stats.totalSales.toLocaleString()}`, icon: DollarSign, color: "text-green-600" },
            { label: "User Base", value: stats.totalUsers, icon: Users, color: "text-blue-600" },
@@ -382,19 +390,22 @@ export default function AdminDashboard({ user }) {
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 flex gap-4 border-b">
-        {['users', 'approvals', 'inventory', 'offers', 'finance', 'settings'].map(tab => (
-           <button  
-             key={tab}
-             className={`pb-2 px-4 font-bold capitalize transition-all ${activeTab === tab ? 'border-b-2 border-purple-600 text-purple-600' : 'text-muted-foreground hover:text-foreground'}`}
-             onClick={() => setActiveTab(tab)}
-           >
-             {tab === 'approvals' && pendingDealers.length > 0 && (
-               <span className="ml-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingDealers.length}</span>
-             )}
-             {tab}
-           </button>
-        ))}
+      <div className="mb-6 relative">
+        <div className="flex gap-2 sm:gap-4 border-b overflow-x-auto scrollbar-hide snap-x snap-mandatory">
+         {['users', 'approvals', 'inventory', 'offers', 'finance', 'settings'].map(tab => (
+            <button  
+              key={tab}
+              className={`pb-2 px-3 sm:px-4 font-bold capitalize transition-all whitespace-nowrap ${activeTab === tab ? 'border-b-2 border-purple-600 text-purple-600' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab === 'approvals' && pendingDealers.length > 0 && (
+                <span className="ml-1 bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingDealers.length}</span>
+              )}
+              {tab}
+            </button>
+         ))}
+        </div>
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white pointer-events-none md:hidden" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -413,7 +424,7 @@ export default function AdminDashboard({ user }) {
                        </div>
                     ) : (
                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm min-w-[640px]">
                              <thead>
                                 <tr className="border-b">
                                    <th className="text-left py-3">Business Info</th>
@@ -488,8 +499,8 @@ export default function AdminDashboard({ user }) {
                     <div className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">RBAC ACTIVE</div>
                  </CardHeader>
                  <CardContent>
-                    <div className="overflow-x-auto">
-                       <table className="w-full text-sm">
+                    <div className="overflow-x-auto scrollbar-hide -webkit-overflow-scrolling-touch">
+                       <table className="w-full text-sm min-w-[500px]">
                           <thead>
                              <tr className="border-b">
                                 <th className="text-left py-3">User</th>
@@ -844,7 +855,7 @@ export default function AdminDashboard({ user }) {
               </div>
               <div className="flex gap-3 pt-4 border-t">
                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                <Button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-700" disabled={updating}>
+                <Button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" disabled={updating}>
                   {updating ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>

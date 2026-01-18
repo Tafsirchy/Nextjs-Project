@@ -26,6 +26,7 @@ export const authOptions = {
         
         // Check registered users from database
         try {
+          console.log(`Attempting login for: ${credentials?.email} at ${API_URL}/api/auth/login`);
           const response = await fetch(`${API_URL}/api/auth/login`, {
             method: 'POST',
             headers: {
@@ -37,9 +38,12 @@ export const authOptions = {
             }),
           });
 
+          console.log(`Backend login status: ${response.status}`);
           const data = await response.json();
+          console.log('Backend response data:', JSON.stringify(data));
 
           if (data.success && data.user) {
+            console.log('Login success, returning user object');
             return {
               id: data.user.id,
               name: data.user.name,
@@ -48,18 +52,26 @@ export const authOptions = {
               isVerified: data.user.isVerified,
               verificationStatus: data.user.verificationStatus
             };
+          } else {
+            console.log('Login failed: data.success is false or no user object');
           }
         } catch (error) {
-          console.error("Auth error:", error);
+          console.error("Auth error details:", error);
         }
         
         // Return null if user data could not be retrieved
+        console.log('Returning null from authorize');
         return null;
       }
     })
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Handle session update (e.g., name change) from client
+      if (trigger === "update" && session?.name) {
+        token.name = session.name;
+      }
+      
       if (user) {
         token.id = user.id;
         token.role = user.role;

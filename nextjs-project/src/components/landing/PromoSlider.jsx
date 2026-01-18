@@ -14,7 +14,7 @@ export default function PromoSlider() {
   useEffect(() => {
     async function fetchPromos() {
       try {
-        const response = await fetch(`${API_URL}/api/promos`);
+        const response = await fetch(`${API_URL}/api/promos/active`);
         const data = await response.json();
         if (data.success && data.promos.length > 0) {
           setPromos(data.promos);
@@ -28,8 +28,26 @@ export default function PromoSlider() {
               discount: 10
             },
             {
+              code: "SAVE20",
+              description: "20% off your entire purchase. Limited time offer!",
+              type: "percentage",
+              discount: 20
+            },
+            {
               code: "RIDE500",
               description: "Save $500 on all Touring models. Limited time offer for adventurers.",
+              type: "fixed",
+              discount: 500
+            },
+            {
+              code: "FLAT500",
+              description: "$500 off your next premium ride.",
+              type: "fixed",
+              discount: 500
+            },
+            {
+              code: "FREESHIP",
+              description: "Free shipping on your order. Professional delivery included.",
               type: "fixed",
               discount: 500
             }

@@ -30,7 +30,7 @@ export default function RootLayout({ children }) {
         <SmoothScroll>
           <Providers>
             <Navbar />
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col pt-16">
               <main className="flex-1">
                 {children}
               </main>

@@ -113,8 +113,8 @@ export default function CartPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Shopping Cart</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">Shopping Cart</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             {cartCount} {cartCount === 1 ? 'item' : 'items'} in your cart
           </p>
         </div>
@@ -123,10 +123,10 @@ export default function CartPage() {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.map((item) => (
-              <Card key={item.id} className="p-6">
-                <div className="flex gap-6">
+              <Card key={item.id} className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                   {/* Image */}
-                  <div className="w-32 h-32 flex-shrink-0">
+                  <div className="w-full sm:w-32 h-48 sm:h-32 flex-shrink-0">
                     <img
                       src={item.bike.image}
                       alt={item.bike.name}
@@ -154,7 +154,7 @@ export default function CartPage() {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between mt-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground">Quantity:</span>

@@ -114,9 +114,9 @@ export default function BikeReviews({ bikeId }) {
 
   return (
     <div className="space-y-8 mt-12">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold flex items-center gap-3">
-          <MessageSquare className="h-8 w-8 text-purple-600" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 break-words">
+          <MessageSquare className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 flex-shrink-0" />
           Customer Reviews
         </h2>
         <div className="flex items-center gap-2 bg-purple-50 px-4 py-2 rounded-lg">

@@ -82,7 +82,7 @@ export default function Hero() {
           />
 
           {/* Unifying Technical Core SVG - Hero Corner Impact */}
-          <div className="absolute -bottom-24 -right-24 opacity-[0.08] blur-[2px]">
+          <div className="absolute -bottom-24 -right-24 opacity-[0.08] blur-[2px] hidden md:block">
              <TechnicalCore size="600px" rotateSpeed={20} withMatrix={true} color="primary" />
           </div>
  
@@ -157,7 +157,7 @@ export default function Hero() {
               className="space-y-4 max-w-3xl"
             >
               {/* Giant Typography Background Effect */}
-              <h1 className="text-[100px] md:text-[150px] lg:text-[180px] font-black text-white/10 absolute -top-10 -left-10 leading-none select-none tracking-tighter mix-blend-overlay pointer-events-none">
+              <h1 className="text-6xl md:text-[150px] lg:text-[180px] font-black text-white/10 absolute -top-10 left-0 md:-left-10 leading-none select-none tracking-tighter mix-blend-overlay pointer-events-none">
                 {slides[current].title}
               </h1>
 
