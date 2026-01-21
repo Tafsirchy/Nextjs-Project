@@ -111,7 +111,51 @@ export default function OrderDetailsPage() {
   if (!order) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 print:bg-white print:py-0">
+    <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 1cm;
+          }
+          
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          .container {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          .print\\:block {
+            display: block !important;
+          }
+          
+          h1, h2, h3, h4, h5, h6 {
+            page-break-after: avoid;
+          }
+          
+          /* Force smaller fonts for invoice header */
+          .invoice-header h1 {
+            font-size: 18px !important;
+          }
+          
+          .invoice-header h2 {
+            font-size: 14px !important;
+          }
+          
+          .invoice-header p,
+          .invoice-header span {
+            font-size: 10px !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+          }
+        }
+      `}</style>
+      <div className="min-h-screen bg-slate-50 py-12 print:bg-white print:py-0">
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Navigation & Actions */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 print:hidden">
@@ -138,15 +182,25 @@ export default function OrderDetailsPage() {
         </div>
 
         {/* Invoice Header (Visible in print) */}
-        <div className="hidden print:flex justify-between items-start mb-12 border-b pb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-purple-600 mb-2">MotruBi</h1>
-            <p className="text-sm text-muted-foreground">Premier Bike Ecosystem</p>
+        <div className="invoice-header hidden print:block mb-8 pb-6 border-b">
+          <div className="flex justify-between items-start">
+            <div className="w-1/2">
+              <h1 className="text-2xl font-bold text-purple-600 mb-1">MotruBi</h1>
+              <p className="text-xs text-muted-foreground">Premier Bike Ecosystem</p>
+            </div>
+            <div className="w-1/2 text-right">
+              <h2 className="text-base font-bold uppercase mb-1">Invoice</h2>
+            </div>
           </div>
-          <div className="text-right">
-            <h2 className="text-xl font-bold uppercase mb-1">Invoice</h2>
-            <p className="font-medium text-purple-600">#{order.orderNumber}</p>
-            <p className="text-sm text-muted-foreground">Date: {new Date(order.createdAt).toLocaleDateString()}</p>
+          <div className="mt-4 space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="font-semibold">Order #:</span>
+              <span className="font-medium text-purple-600">{order.orderNumber}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="font-semibold">Date:</span>
+              <span>{new Date(order.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+            </div>
           </div>
         </div>
 
@@ -245,8 +299,8 @@ export default function OrderDetailsPage() {
                   <div className="text-slate-600">{order.shippingAddress.country}</div>
                   <div className="pt-2 border-t mt-2">
                      <div className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Contact Info</div>
-                     <div className="text-slate-700">{order.shippingAddress.phone}</div>
-                     <div className="text-slate-700 truncate">{order.shippingAddress.email}</div>
+                     <div className="text-slate-700 break-all">{order.shippingAddress.phone}</div>
+                     <div className="text-slate-700 break-all text-xs">{order.shippingAddress.email}</div>
                   </div>
                </CardContent>
             </Card>
@@ -295,10 +349,11 @@ export default function OrderDetailsPage() {
       </div>
 
       {/* Print-only Footer */}
-      <div className="hidden print:block fixed bottom-0 left-0 right-0 p-8 border-t text-center text-[10px] text-muted-foreground bg-white">
-        <p>MotruBi Premier Bike Ecosystem • 123 Bike Lane, Cycle City, CC 12345 • contact@motrubi.com</p>
+      <div className="hidden print:block mt-12 pt-8 border-t text-center text-xs text-muted-foreground bg-white">
+        <p className="break-words">MotruBi Premier Bike Ecosystem • 123 Bike Lane, Cycle City, CC 12345 • contact@motrubi.com</p>
         <p className="mt-1">© {new Date().getFullYear()} MotruBi. All rights reserved.</p>
       </div>
     </div>
+    </>
   );
 }

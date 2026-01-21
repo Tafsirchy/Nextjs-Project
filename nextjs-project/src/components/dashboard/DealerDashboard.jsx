@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useCart } from "@/contexts/CartContext";
+import jsPDF from "jspdf";
 
 import Image from "next/image";
 
@@ -62,6 +63,10 @@ export default function DealerDashboard({ user }) {
   
   // Bulk Order State
   const [bulkItems, setBulkItems] = useState({});
+  
+  // Billing Statements State
+  const [statements, setStatements] = useState([]);
+  const [loadingStatements, setLoadingStatements] = useState(false);
 
   const { addToCart } = useCart();
 
@@ -119,9 +124,151 @@ export default function DealerDashboard({ user }) {
     }
   }, [user.email]);
 
+  const fetchStatements = useCallback(async () => {
+    setLoadingStatements(true);
+    try {
+      const res = await fetch(`${API_URL}/api/dealer/statements`, {
+        headers: { 'Authorization': `Bearer ${user.email}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatements(data.statements || []);
+      } else {
+        console.error('Failed to fetch statements:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching statements:', error);
+    } finally {
+      setLoadingStatements(false);
+    }
+  }, [user.email]);
+
   useEffect(() => {
     fetchDealerData();
-  }, [fetchDealerData]);
+    fetchStatements();
+  }, [fetchDealerData, fetchStatements]);
+
+
+  const handleDownloadStatement = (statement) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFillColor(102, 126, 234);
+      doc.rect(0, 0, 210, 40, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont(undefined, 'bold');
+      doc.text('MotruBi', 20, 20);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text('Premium Motorcycles - Dealer Billing Statement', 20, 30);
+      
+      // Statement Info
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${statement.monthName} Statement`, 20, 55);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Statement Date: ${new Date().toLocaleDateString()}`, 20, 65);
+      doc.text(`Due Date: ${new Date(statement.dueDate).toLocaleDateString()}`, 20, 72);
+      doc.text(`Terms: NET-30`, 20, 79);
+      
+      // Dealer Info
+      doc.setFont(undefined, 'bold');
+      doc.text('Dealer Information', 20, 92);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Email: ${user.email}`, 20, 99);
+      doc.text(`Account: Verified Dealer`, 20, 106);
+      
+      // Order Summary Box
+      doc.setFillColor(248, 249, 250);
+      doc.rect(20, 120, 170, 40, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(20, 120, 170, 40, 'S');
+      
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('Order Summary', 25, 130);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Total Orders: ${statement.orderCount}`, 25, 140);
+      doc.text(`Total Amount: $${statement.totalAmount.toLocaleString()}`, 25, 147);
+      doc.text(`Wholesale Savings: $${statement.totalSavings?.toLocaleString() || '0'}`, 25, 154);
+      
+      // Orders Table
+      doc.setFont(undefined, 'bold');
+      doc.text('Order Details', 20, 175);
+      
+      // Table Header
+      doc.setFillColor(102, 126, 234);
+      doc.rect(20, 180, 170, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.text('Order #', 25, 186);
+      doc.text('Date', 70, 186);
+      doc.text('Items', 110, 186);
+      doc.text('Amount', 150, 186);
+      
+      // Table Rows
+      doc.setTextColor(0, 0, 0);
+      let yPos = 196;
+      
+      statement.orders.slice(0, 10).forEach((order, idx) => {
+        if (yPos > 270) return; // Prevent overflow
+        
+        if (idx % 2 === 0) {
+          doc.setFillColor(248, 249, 250);
+          doc.rect(20, yPos - 5, 170, 8, 'F');
+        }
+        
+        doc.text(order.orderNumber || 'N/A', 25, yPos);
+        doc.text(new Date(order.date).toLocaleDateString(), 70, yPos);
+        doc.text(String(order.itemCount || 0), 110, yPos);
+        doc.text(`$${order.total.toLocaleString()}`, 150, yPos);
+        
+        yPos += 8;
+      });
+      
+      if (statement.orders.length > 10) {
+        doc.setFont(undefined, 'italic');
+        doc.setFontSize(8);
+        doc.text(`... and ${statement.orders.length - 10} more orders`, 25, yPos);
+        yPos += 8;
+      }
+      
+      // Total
+      yPos += 5;
+      doc.setDrawColor(102, 126, 234);
+      doc.setLineWidth(0.5);
+      doc.line(20, yPos, 190, yPos);
+      
+      yPos += 8;
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('Total Due:', 130, yPos);
+      doc.text(`$${statement.totalAmount.toLocaleString()}`, 160, yPos);
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Thank you for your business!', 105, 285, { align: 'center' });
+      doc.text('For questions, contact: support@motrubi.com', 105, 290, { align: 'center' });
+      
+      // Save PDF
+      doc.save(`statement-${statement.month}.pdf`);
+      toast.success('Statement downloaded successfully');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF');
+    }
+  };
 
   const handleVerificationSubmit = async (e) => {
     e.preventDefault();
@@ -566,68 +713,213 @@ export default function DealerDashboard({ user }) {
       )}
 
       {activeTab === 'calculator' && (
-        <div className="max-w-4xl mx-auto space-y-6">
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="bg-purple-600 text-white rounded-t-xl">
-               <CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5" /> Wholesale Pricing Calculator</CardTitle>
-               <p className="text-purple-100 text-xs">Estimate your procurement costs and profit margins based on volume tiers.</p>
-            </CardHeader>
-            <CardContent className="p-8">
-               <div className="grid md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                     <div>
-                        <label className="text-xs font-bold uppercase text-slate-500 mb-2 block">Select Model</label>
+        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Input & Configuration Section */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="border-0 shadow-lg bg-white overflow-hidden">
+                <CardHeader className="bg-slate-900 text-white p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/20 rounded-lg">
+                      <Calculator className="h-6 w-6 text-purple-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">Wholesale Configuration</CardTitle>
+                      <p className="text-slate-400 text-xs mt-1">Configure your procurement volume and analyze discounted pricing.</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                        Product Selection
+                      </label>
+                      <div className="relative">
                         <select 
-                          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-purple-500 outline-none"
+                          className="w-full h-14 pl-4 pr-10 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 text-sm font-semibold focus:ring-2 focus:ring-purple-500 outline-none appearance-none transition-all hover:border-slate-300"
                           value={calcBikeId}
                           onChange={(e) => setCalcBikeId(e.target.value)}
                         >
-                           <option value="">-- Choose a Bike --</option>
-                           {bikes.map(b => (
-                             <option key={b.id} value={b.id}>{b.name} (${b.price.toLocaleString()})</option>
-                           ))}
+                          <option value="">-- Select Bike Model --</option>
+                          {bikes.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
                         </select>
-                     </div>
-                     <div>
-                        <label className="text-xs font-bold uppercase text-slate-500 mb-2 block">Order Quantity</label>
-                        <Input type="number" min="1" value={calcQty} onChange={(e) => setCalcQty(parseInt(e.target.value) || 1)} className="py-6 text-lg" />
-                     </div>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                          <ChevronRight className="h-4 w-4 rotate-90" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                        Unit Quantity
+                      </label>
+                      <div className="flex items-center gap-3 h-14 bg-slate-50/50 rounded-xl border border-slate-200 px-4">
+                        <button 
+                          className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 flex items-center justify-center transition-all"
+                          onClick={() => setCalcQty(Math.max(1, calcQty - 1))}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          value={calcQty} 
+                          onChange={(e) => setCalcQty(parseInt(e.target.value) || 1)} 
+                          className="border-0 bg-transparent text-center font-bold text-lg focus-visible:ring-0 px-0 h-auto"
+                        />
+                        <button 
+                          className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 flex items-center justify-center transition-all text-purple-600"
+                          onClick={() => setCalcQty(calcQty + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-200 space-y-4">
-                     <h4 className="text-sm font-bold uppercase text-slate-400 border-b pb-2">Procurement Breakdown</h4>
-                     <div className="flex justify-between text-sm">
-                        <span>Base MSRP Total</span>
-                        <span className="font-bold">${((selectedBike?.price || 0) * calcQty).toLocaleString()}</span>
-                     </div>
-                     <div className="flex justify-between text-sm text-green-600 font-bold">
-                        <span>Volume Tier Discount ({Math.round(discountRate * 100)}%)</span>
-                        <span>- ${(selectedBike?.price || 0) * calcQty * discountRate}</span>
-                     </div>
-                     <div className="flex justify-between text-lg font-bold border-t pt-4 text-purple-700">
-                        <span>Wholesale Payable</span>
-                        <span>${((selectedBike?.price || 0) * calcQty * (1 - discountRate)).toLocaleString()}</span>
-                     </div>
+
+                  {selectedBike ? (
+                    <div className="p-6 bg-purple-50 rounded-2xl border border-purple-100 flex items-center gap-6 animate-in zoom-in-95 duration-300">
+                      <Image 
+                        src={selectedBike.image} 
+                        alt={selectedBike.name} 
+                        width={120} 
+                        height={80} 
+                        className="rounded-xl shadow-md border bg-white object-cover aspect-[3/2]" 
+                      />
+                      <div className="flex-1">
+                        <div className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">{selectedBike.category}</div>
+                        <h4 className="text-xl font-bold text-slate-900">{selectedBike.name}</h4>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-sm font-medium text-slate-500">MSRP: <span className="text-slate-900 font-bold">${selectedBike.price.toLocaleString()}</span></span>
+                          <span className="h-1 w-1 rounded-full bg-slate-300" />
+                          <span className="text-sm font-medium text-slate-500">In Stock: <span className="text-slate-900 font-bold">{selectedBike.stock} units</span></span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-[120px] rounded-2xl border-2 border-dashed border-slate-100 flex items-center justify-center text-slate-400 text-sm italic">
+                      Select a bike model to begin procurement analysis
+                    </div>
+                  )}
+
+                  <div className="grid md:grid-cols-4 gap-4 pt-4">
+                    {[
+                      { name: "Tier 1", qty: "1-5", off: 0.10 },
+                      { name: "Tier 2", qty: "6-10", off: 0.15 },
+                      { name: "Tier 3", qty: "11-20", off: 0.20 },
+                      { name: "Tier 4", qty: "21+", off: 0.25 },
+                    ].map((t, i) => {
+                      const isActive = discountRate === t.off;
+                      return (
+                        <div 
+                          key={i} 
+                          className={`relative p-4 rounded-xl border transition-all duration-300 ${
+                            isActive 
+                              ? 'bg-purple-600 border-purple-600 shadow-lg shadow-purple-200 -translate-y-1' 
+                              : 'bg-white border-slate-100'
+                          }`}
+                        >
+                          <div className={`text-[9px] font-black uppercase tracking-widest mb-1 ${isActive ? 'text-purple-200' : 'text-slate-400'}`}>{t.name}</div>
+                          <div className={`text-xl font-bold ${isActive ? 'text-white' : 'text-slate-800'}`}>{Math.round(t.off * 100)}% <span className="text-xs opacity-60">OFF</span></div>
+                          <div className={`text-[10px] mt-1 ${isActive ? 'text-purple-100' : 'text-slate-500'}`}>{t.qty} units</div>
+                          {isActive && (
+                            <div className="absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-md">
+                              <CheckCircle className="h-3 w-3" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-               </div>
-            </CardContent>
-          </Card>
-          
-          <div className="grid md:grid-cols-4 gap-4">
-             {[
-               { name: "Tier 1", qty: "1-5", off: "10%" },
-               { name: "Tier 2", qty: "6-10", off: "15%" },
-               { name: "Tier 3", qty: "11-20", off: "20%" },
-               { name: "Tier 4", qty: "21+", off: "25%" },
-             ].map((t, i) => (
-               <Card key={i} className={`border-0 shadow-sm ${discountRate === parseFloat(t.off)/100 ? 'ring-2 ring-purple-600 bg-purple-50' : ''}`}>
-                  <CardContent className="p-4 text-center">
-                     <div className="text-[10px] font-bold text-slate-400 uppercase">{t.name}</div>
-                     <div className="text-xl font-bold text-slate-800">{t.off} OFF</div>
-                     <div className="text-[10px] text-slate-500">{t.qty} units</div>
-                  </CardContent>
-               </Card>
-             ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Financial Summary & Actions Section */}
+            <div className="space-y-6">
+              <Card className="border-0 shadow-lg bg-slate-900 text-white overflow-hidden">
+                <CardHeader className="border-b border-slate-800 p-6">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Financial Impact</CardTitle>
+                    <TrendingUp className="h-5 w-5 text-emerald-400" />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-400">Gross Procurement (MSRP)</span>
+                      <span className="font-bold font-mono">${((selectedBike?.price || 0) * calcQty).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-400">Wholesale Savings</span>
+                      <span className="font-bold font-mono text-emerald-400">-${(((selectedBike?.price || 0) * calcQty) * discountRate).toLocaleString()}</span>
+                    </div>
+                    <div className="pt-4 border-t border-slate-800 flex justify-between items-end">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-1">Effective Wholesale Total</span>
+                        <span className="text-3xl font-bold font-mono text-white tracking-tighter">
+                          ${(((selectedBike?.price || 0) * calcQty) * (1 - discountRate)).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded text-[10px] font-black">
+                        -{Math.round(discountRate * 100)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                      <Award className="h-4 w-4 text-purple-400" />
+                      <span>Profit Projection (Estimate)</span>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-bold text-emerald-400">${(((selectedBike?.price || 0) * calcQty) * discountRate).toLocaleString()}</span>
+                      <p className="text-[9px] text-slate-500 mt-1 uppercase tracking-tighter">Projected margin realized upon retail sale at MSRP</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4">
+                    <Button 
+                      className="w-full h-14 bg-white text-slate-900 hover:bg-slate-100 font-black text-sm uppercase tracking-widest border-0 flex items-center justify-center gap-2"
+                      disabled={!selectedBike || submitting}
+                      onClick={async () => {
+                        if (!selectedBike) return;
+                        setSubmitting(true);
+                        const success = await addToCart(selectedBike, calcQty);
+                        if (success) {
+                          toast.success("Procurement order added to batch");
+                        }
+                        setSubmitting(false);
+                      }}
+                    >
+                      <ShoppingCart className="h-5 w-5" />
+                      {submitting ? "Initiating..." : "Initiate Batch Order"}
+                    </Button>
+                    <p className="text-[9px] text-center text-slate-500 uppercase tracking-widest">
+                      Price lock guaranteed for 15 minutes
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-md bg-white">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                      <Package className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-bold text-slate-900">Need Custom Fleet Pricing?</h5>
+                      <p className="text-xs text-slate-500 mt-1">Ordering over 50 units? Contact your regional merchandiser for hyper-wholesale quotes.</p>
+                      <button className="text-blue-600 text-xs font-bold mt-2 hover:underline">Request Contact</button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       )}
@@ -653,18 +945,50 @@ export default function DealerDashboard({ user }) {
                  </div>
                  
                  <h4 className="font-bold mb-4">Upcoming Statements</h4>
-                 <div className="space-y-3">
-                    <div className="p-4 border rounded-xl flex items-center justify-between">
-                       <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold">JAN</div>
-                          <div>
-                             <div className="font-bold">January 2026 Procurement Statement</div>
-                             <div className="text-xs text-slate-400">Due in 15 days</div>
-                          </div>
-                       </div>
-                       <Button variant="outline" size="sm">Download JSON</Button>
-                    </div>
-                 </div>
+                 {loadingStatements ? (
+                   <div className="p-8 text-center">
+                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-purple-600 border-t-transparent"></div>
+                     <p className="text-sm text-muted-foreground mt-2">Loading statements...</p>
+                   </div>
+                 ) : statements.length === 0 ? (
+                   <div className="p-8 text-center text-muted-foreground">
+                     <p className="text-sm">No billing statements available yet.</p>
+                     <p className="text-xs mt-1">Statements will appear here after you place orders.</p>
+                   </div>
+                 ) : (
+                   <div className="space-y-3">
+                     {statements.map((statement) => {
+                       const monthAbbr = new Date(statement.month + '-01').toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+                       return (
+                         <div key={statement.month} className="p-4 border rounded-xl flex items-center justify-between hover:border-purple-200 transition-colors">
+                           <div className="flex items-center gap-4">
+                             <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-xs">
+                               {monthAbbr}
+                             </div>
+                             <div>
+                               <div className="font-bold">{statement.monthName} Procurement Statement</div>
+                               <div className="text-xs text-slate-400">
+                                 {statement.orderCount} order{statement.orderCount !== 1 ? 's' : ''} • ${statement.totalAmount.toLocaleString()} • 
+                                 {statement.isPastDue ? (
+                                   <span className="text-red-600 ml-1">Past due</span>
+                                 ) : (
+                                   <span className="ml-1">Due in {statement.daysUntilDue} days</span>
+                                 )}
+                               </div>
+                             </div>
+                           </div>
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             onClick={() => handleDownloadStatement(statement)}
+                           >
+                             Download PDF
+                           </Button>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 )}
               </CardContent>
            </Card>
         </div>

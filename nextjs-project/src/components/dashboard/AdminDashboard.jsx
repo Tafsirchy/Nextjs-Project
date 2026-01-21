@@ -19,7 +19,9 @@ import {
   Trash2,
   Eye,
   X,
-  Edit
+  Edit,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -28,7 +30,11 @@ export default function AdminDashboard({ user }) {
     totalSales: 0,
     totalOrders: 0,
     totalUsers: 0,
-    totalInventory: 0
+    totalInventory: 0,
+    averageOrderValue: 0,
+    salesByMonth: {},
+    revenueByCategory: {},
+    topProducts: []
   });
   const [users, setUsers] = useState([]);
   const [promos, setPromos] = useState([]);
@@ -45,6 +51,11 @@ export default function AdminDashboard({ user }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bikeToDelete, setBikeToDelete] = useState(null);
+  
+  // Pagination
+  const [userPage, setUserPage] = useState(1);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const pageSize = 10;
 
   const fetchAdminData = useCallback(async () => {
     try {
@@ -509,7 +520,7 @@ export default function AdminDashboard({ user }) {
                              </tr>
                           </thead>
                           <tbody>
-                             {users.map(u => (
+                             {users.slice((userPage - 1) * pageSize, userPage * pageSize).map(u => (
                                 <tr key={u.email} className="border-b last:border-0 hover:bg-slate-50">
                                    <td className="py-4">
                                       <div className="font-bold">{u.name}</div>
@@ -543,6 +554,50 @@ export default function AdminDashboard({ user }) {
                           </tbody>
                        </table>
                     </div>
+
+                    {/* User Pagination Controls */}
+                    {users.length > pageSize && (
+                      <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 font-medium">
+                          Showing <span className="text-slate-900">{(userPage - 1) * pageSize + 1}</span> to <span className="text-slate-900">{Math.min(userPage * pageSize, users.length)}</span> of <span className="text-slate-900">{users.length}</span> identities
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setUserPage(prev => Math.max(prev - 1, 1))}
+                            disabled={userPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <div className="flex items-center gap-1">
+                            {[...Array(Math.ceil(users.length / pageSize))].map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setUserPage(i + 1)}
+                                className={`h-8 w-8 rounded text-xs font-bold transition-all ${
+                                  userPage === i + 1 
+                                    ? "bg-purple-600 text-white shadow-md shadow-purple-200" 
+                                    : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                              >
+                                {i + 1}
+                              </button>
+                            ))}
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setUserPage(prev => Math.min(prev + 1, Math.ceil(users.length / pageSize)))}
+                            disabled={userPage === Math.ceil(users.length / pageSize)}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                  </CardContent>
                </Card>
             )}
@@ -653,16 +708,175 @@ export default function AdminDashboard({ user }) {
             )}
 
             {activeTab === 'finance' && (
-               <Card>
-                 <CardHeader><CardTitle>Platform Revenue Analytics</CardTitle></CardHeader>
-                 <CardContent className="h-64 flex items-center justify-center bg-slate-50 border border-dashed rounded-xl m-4">
-                    <div className="text-center">
-                       <BarChart className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                       <p className="text-sm text-slate-400">Financial charting module active in Phase 13</p>
-                       <p className="text-[10px] font-bold text-purple-600 mt-1 uppercase tracking-widest">Aggregate Sales: ${stats.totalSales.toLocaleString()}</p>
-                    </div>
-                 </CardContent>
-               </Card>
+               <div className="space-y-6">
+                  {/* Revenue Summary Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Card className="bg-white border-slate-100 shadow-sm overflow-hidden">
+                      <div className="h-1 bg-emerald-500 w-full"></div>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Avg Order Value</p>
+                          <TrendingUp className="h-4 w-4 text-emerald-500" />
+                        </div>
+                        <h3 className="text-3xl font-extrabold text-slate-900">${Math.round(stats.averageOrderValue || 0).toLocaleString()}</h3>
+                        <p className="text-[10px] text-slate-400 mt-2">Platform-wide mean conversion value</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border-slate-100 shadow-sm overflow-hidden">
+                      <div className="h-1 bg-blue-500 w-full"></div>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Customers</p>
+                          <Users className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <h3 className="text-3xl font-extrabold text-slate-900">{stats.totalUsers || 0}</h3>
+                        <p className="text-[10px] text-slate-400 mt-2">Unique profiles with purchase potential</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-white border-slate-100 shadow-sm overflow-hidden">
+                      <div className="h-1 bg-purple-500 w-full"></div>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Yield Momentum</p>
+                          <Activity className="h-4 w-4 text-purple-500" />
+                        </div>
+                        <h3 className="text-3xl font-extrabold text-slate-900">
+                          {Object.keys(stats.salesByMonth || {}).length > 0 ? Object.keys(stats.salesByMonth).length : 0} Months
+                        </h3>
+                        <p className="text-[10px] text-slate-400 mt-2">Historical data reach in active cycle</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Charts Row */}
+                  <div className="grid lg:grid-cols-2 gap-6">
+                    {/* Revenue by Category (Horizontal Bar) */}
+                    <Card className="shadow-sm border-slate-100">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-emerald-500" />
+                          REVENUE BY SEGMENT
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {Object.entries(stats.revenueByCategory || {}).length > 0 ? (
+                          Object.entries(stats.revenueByCategory).map(([category, amount]) => {
+                            const percentage = stats.totalSales > 0 ? (amount / stats.totalSales) * 100 : 0;
+                            return (
+                              <div key={category} className="space-y-1.5">
+                                <div className="flex justify-between text-xs font-bold">
+                                  <span className="text-slate-600 uppercase tracking-wider">{category}</span>
+                                  <span className="text-slate-900">${amount.toLocaleString()}</span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
+                                    style={{ width: `${percentage}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="h-48 flex flex-col items-center justify-center text-slate-300 border border-dashed rounded-lg">
+                            <BarChart className="h-8 w-8 mb-2 opacity-20" />
+                            <p className="text-xs uppercase tracking-widest font-bold">No categorical data</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Monthly Volume (Vertical Bar) */}
+                    <Card className="shadow-sm border-slate-100">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-blue-500" />
+                          FISCAL VOLUME TRENDS
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-48 flex items-end justify-between gap-2 pt-4">
+                          {Object.entries(stats.salesByMonth || {}).length > 0 ? (
+                            Object.entries(stats.salesByMonth).sort().slice(-6).map(([month, amount]) => {
+                              const maxRev = Math.max(...Object.values(stats.salesByMonth));
+                              const height = maxRev > 0 ? (amount / maxRev) * 100 : 0;
+                              return (
+                                <div key={month} className="flex-1 flex flex-col items-center gap-2 group">
+                                  <div className="relative w-full flex items-end justify-center h-32">
+                                    <div 
+                                      className="w-full max-w-[40px] bg-slate-100 group-hover:bg-blue-100 rounded-t-sm transition-all duration-500 relative"
+                                      style={{ height: `${height}%` }}
+                                    >
+                                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap z-10">
+                                        ${Math.round(amount/1000)}k
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 rotate-45 mt-2">{month.split('-').length > 1 ? `${month.split('-')[1]}/${month.split('-')[0].substring(2)}` : month}</span>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="w-full flex flex-col items-center justify-center text-slate-300 border border-dashed rounded-lg h-40">
+                              <BarChart className="h-8 w-8 mb-2 opacity-20" />
+                              <p className="text-xs uppercase tracking-widest font-bold">Awaiting Transaction Cycles</p>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Top Products Table */}
+                  <Card className="shadow-sm border-slate-100">
+                    <CardHeader className="border-b border-slate-50 flex flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <Award className="h-4 w-4 text-amber-500" />
+                        TOP PERFORMING MACHINES
+                      </CardTitle>
+                      <span className="text-[10px] font-extrabold bg-amber-100 text-amber-700 px-2 py-0.5 rounded uppercase tracking-wider">High Velocity</span>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100">
+                              <th className="text-left py-3 px-6 font-bold text-slate-400 uppercase tracking-widest">Model Name</th>
+                              <th className="text-center py-3 px-6 font-bold text-slate-400 uppercase tracking-widest">Units Sold</th>
+                              <th className="text-right py-3 px-6 font-bold text-slate-400 uppercase tracking-widest">Total Yield</th>
+                              <th className="text-right py-3 px-6 font-bold text-slate-400 uppercase tracking-widest">Market Share</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.topProducts && stats.topProducts.length > 0 ? (
+                              stats.topProducts.map((product, i) => (
+                                <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                  <td className="py-4 px-6">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500">{i + 1}</div>
+                                      <span className="font-bold text-slate-700">{product.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 px-6 text-center font-medium">{product.quantity} units</td>
+                                  <td className="py-4 px-6 text-right font-bold text-blue-600">${product.revenue.toLocaleString()}</td>
+                                  <td className="py-4 px-6 text-right">
+                                    <span className="text-slate-500 font-medium">{stats.totalSales > 0 ? Math.round((product.revenue / stats.totalSales) * 100) : 0}%</span>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan="4" className="py-12 text-center text-slate-400 italic">No sales data available to analyze product performance.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+               </div>
             )}
 
 
@@ -685,7 +899,7 @@ export default function AdminDashboard({ user }) {
                              </tr>
                           </thead>
                           <tbody>
-                             {inventory.map(bike => (
+                             {inventory.slice((inventoryPage - 1) * pageSize, inventoryPage * pageSize).map(bike => (
                                 <tr key={bike.id} className="border-b last:border-0 hover:bg-slate-50">
                                    <td className="py-4">
                                       <div className="flex items-center gap-3">
@@ -732,6 +946,50 @@ export default function AdminDashboard({ user }) {
                           </tbody>
                        </table>
                     </div>
+
+                    {/* Inventory Pagination Controls */}
+                    {inventory.length > pageSize && (
+                      <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 font-medium">
+                          Showing <span className="text-slate-900">{(inventoryPage - 1) * pageSize + 1}</span> to <span className="text-slate-900">{Math.min(inventoryPage * pageSize, inventory.length)}</span> of <span className="text-slate-900">{inventory.length}</span> machines
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setInventoryPage(prev => Math.max(prev - 1, 1))}
+                            disabled={inventoryPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <div className="flex items-center gap-1">
+                            {[...Array(Math.ceil(inventory.length / pageSize))].map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setInventoryPage(i + 1)}
+                                className={`h-8 w-8 rounded text-xs font-bold transition-all ${
+                                  inventoryPage === i + 1 
+                                    ? "bg-purple-600 text-white shadow-md shadow-purple-200" 
+                                    : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                              >
+                                {i + 1}
+                              </button>
+                            ))}
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setInventoryPage(prev => Math.min(prev + 1, Math.ceil(inventory.length / pageSize)))}
+                            disabled={inventoryPage === Math.ceil(inventory.length / pageSize)}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                  </CardContent>
                </Card>
             )}

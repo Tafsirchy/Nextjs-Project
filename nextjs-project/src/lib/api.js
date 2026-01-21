@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
 // Fetch all bikes
 export async function fetchBikes(filters = {}) {
@@ -10,6 +10,13 @@ export async function fetchBikes(filters = {}) {
     if (filters.minPrice) params.append('minPrice', filters.minPrice);
     if (filters.maxPrice) params.append('maxPrice', filters.maxPrice);
     if (filters.search) params.append('search', filters.search);
+    
+    // Pagination
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    
+    // Sorting
+    if (filters.sort) params.append('sort', filters.sort);
     
     const queryString = params.toString();
     const url = `${API_URL}/api/bikes${queryString ? `?${queryString}` : ''}`;

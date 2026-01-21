@@ -22,7 +22,7 @@ export function Logo({ className = "h-8 w-auto", showText = true }) {
       </div>
       
       {showText && (
-        <span className="text-2xl font-syncopate font-bold tracking-tighter bg-gradient-to-r from-[#000080] via-[#a855f7] to-[#22d3ee] bg-clip-text text-transparent">
+        <span className="text-2xl font-syncopate font-bold tracking-tighter bg-gradient-to-r from-blue-900 via-purple-700 to-purple-900 bg-clip-text text-transparent">
           MotruBi
         </span>
       )}

@@ -1,111 +1,144 @@
 import Link from "next/link";
-import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
+import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { Star, ArrowRight, Heart, ShoppingCart } from "lucide-react";
+import { Star, Heart, Gauge, Zap, ShoppingCart, ArrowRight, Eye } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useWishlist } from "@/contexts/WishlistContext";
+import { useState } from "react";
+import QuickViewModal from "./QuickViewModal";
 
 export default function BikeCard({ bike, showMoveToCart = false, onMoveToCart }) {
   const { data: session } = useSession();
   const { toggleWishlist, isInWishlist } = useWishlist();
+  const [showQuickView, setShowQuickView] = useState(false);
   
   const isDealer = session?.user?.role === 'dealer';
   const isWishlisted = isInWishlist(bike.id);
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-shadow duration-300 group">
-      {/* ... existing image div ... */}
-      <div className="relative h-64 overflow-hidden bg-gray-100">
-        <img
-          src={bike.image}
-          alt={bike.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-        />
-        {bike.featured && (
-          <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-semibold">
-            Featured
-          </div>
-        )}
-        {isDealer && (
-          <div className="absolute bottom-4 left-4">
-            <div className="px-3 py-1 rounded-full bg-green-600 text-white text-xs font-bold shadow-lg">
-              10-25% OFF
-            </div>
-          </div>
-        )}
-        <div className="absolute top-4 right-4 flex flex-row items-center gap-2">
-          <div className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-sm text-white text-xs font-medium">
-            {bike.category}
-          </div>
+    <Card className="overflow-hidden bg-white hover:shadow-2xl transition-all duration-300 group border-slate-100 h-full flex flex-col">
+      {/* Image Section - Compact h-48 */}
+      <div className="relative h-48 overflow-hidden bg-gray-100">
+        <Link href={`/bikes/${bike.id}`} className="block h-full w-full">
+          <img
+            src={bike.image}
+            alt={bike.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        </Link>
+        
+        {/* Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+          {bike.featured && (
+            <span className="px-2 py-0.5 rounded-md bg-white/90 backdrop-blur-md text-[#000080] text-[10px] font-bold uppercase tracking-wider shadow-sm">
+              Featured
+            </span>
+          )}
+          {isDealer && (
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
+              Deal
+            </span>
+          )}
+        </div>
+
+        {/* Floating Actions */}
+        <div className="absolute top-3 right-3 flex flex-col gap-2">
           <button
-            onClick={() => toggleWishlist(bike.id)}
-            className={`p-2 rounded-full backdrop-blur-md transition-all duration-300 ${
+            onClick={(e) => {
+              e.preventDefault();
+              toggleWishlist(bike.id);
+            }}
+            className={`h-8 w-8 flex items-center justify-center rounded-full backdrop-blur-md shadow-sm transition-all duration-300 ${
               isWishlisted 
                 ? "bg-red-500 text-white" 
-                : "bg-white/70 text-gray-900 hover:bg-white"
+                : "bg-white/90 text-slate-700 hover:bg-white"
             }`}
           >
             <Heart className={`h-4 w-4 ${isWishlisted ? "fill-current" : ""}`} />
           </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              setShowQuickView(true);
+            }}
+            className="h-8 w-8 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-md text-slate-700 hover:bg-white shadow-sm transition-all duration-300"
+            aria-label="Quick View"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        </div>
+        
+        {/* Category Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3 pt-8">
+           <span className="text-white text-xs font-medium px-2 py-1 rounded-full border border-white/20 bg-black/20 backdrop-blur-sm">
+            {bike.category}
+           </span>
         </div>
       </div>
 
-      <CardHeader>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold leading-tight line-clamp-1">{bike.name}</h3>
+      {/* Content Section - Compact Padding */}
+      <div className="p-4 flex flex-col flex-grow">
+        <div className="flex justify-between items-start mb-2">
+          <Link href={`/bikes/${bike.id}`} className="group-hover:text-purple-700 transition-colors">
+            <h3 className="font-bold text-slate-800 text-lg leading-tight line-clamp-1" title={bike.name}>
+              {bike.name}
+            </h3>
+          </Link>
+          <div className="flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded text-amber-600">
+            <Star className="h-3 w-3 fill-current" />
+            <span className="text-xs font-bold">{bike.rating || "New"}</span>
+          </div>
+        </div>
+
+        {/* Compact Specs */}
+        <div className="flex items-center gap-4 text-xs text-slate-500 mb-4">
           <div className="flex items-center gap-1">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="text-sm font-medium">{bike.rating}</span>
-            <span className="text-sm text-muted-foreground ml-1">({bike.stock} in stock)</span>
+            <Gauge className="h-3.5 w-3.5" />
+            <span>{bike.engine}</span>
+          </div>
+          <div className="w-px h-3 bg-slate-200"></div>
+          <div className="flex items-center gap-1">
+            <Zap className="h-3.5 w-3.5" />
+            <span>{bike.power}</span>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent>
-        <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
-          {bike.description}
-        </p>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        {/* Price & Action */}
+        <div className="mt-auto flex items-end justify-between pt-3 border-t border-slate-50">
           <div>
-            <span className="text-muted-foreground">Engine:</span>
-            <span className="font-medium ml-1">{bike.engine}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Power:</span>
-            <span className="font-medium ml-1">{bike.power}</span>
-          </div>
-        </div>
-      </CardContent>
-
-      <CardFooter className="flex flex-col gap-3 pt-6 border-t font-sans">
-        <div className="flex items-center justify-between w-full">
-          <div>
-            <div className="text-2xl font-bold text-purple-600">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-0.5">
+              {isDealer ? 'Dealer Price' : 'Starting From'}
+            </p>
+            <div className="text-xl font-extrabold text-[#000080]">
               ${bike.price.toLocaleString()}
             </div>
-            <div className="text-xs text-muted-foreground">
-              {isDealer ? 'Base price' : 'Starting price'}
-            </div>
           </div>
-          <Link href={`/bikes/${bike.id}`}>
-            <Button className="gap-2 bike-gradient-alt text-white border-0">
-              Details
-              <ArrowRight className="h-4 w-4" />
+          
+          {showMoveToCart ? (
+            <Button 
+              size="sm"
+              variant="outline"
+              className="h-9 px-3 border-purple-200 text-purple-700 hover:bg-purple-50"
+              onClick={() => onMoveToCart(bike)}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" /> Cart
             </Button>
-          </Link>
+          ) : (
+             <Link href={`/bikes/${bike.id}`}>
+              <Button size="sm" className="h-9 w-9 p-0 rounded-full bike-gradient-alt text-white shadow-md hover:shadow-lg transition-all hover:scale-105">
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
         </div>
-        
-        {showMoveToCart && (
-          <Button 
-            variant="outline" 
-            className="w-full gap-2 border-purple-200 hover:bg-purple-50 hover:text-purple-700 text-purple-600 font-bold"
-            onClick={() => onMoveToCart(bike)}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            Move to Cart
-          </Button>
-        )}
-      </CardFooter>
+      </div>
+      
+      {/* Quick View Modal */}
+      <QuickViewModal 
+        bike={bike} 
+        open={showQuickView} 
+        onOpenChange={setShowQuickView} 
+      />
     </Card>
   );
 }

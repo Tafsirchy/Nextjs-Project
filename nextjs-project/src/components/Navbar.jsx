@@ -27,7 +27,7 @@ export default function Navbar() {
   const isActive = (path) => pathname === path;
 
   return (
-    <nav className="fixed top-0 z-50 w-full border-b border-white/5 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 transition-all duration-300">
+    <nav className="fixed top-0 z-50 w-full border-b border-gray-100 bg-white/95 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 transition-all duration-300">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -36,14 +36,14 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-6">
+          <div className="hidden lg:flex lg:items-center lg:space-x-6">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`text-sm font-medium transition-all relative py-1 px-1 ${
                   isActive(link.href)
-                    ? "text-cyan-400"
+                    ? "text-purple-600"
                     : "text-[#000080] hover:text-blue-700"
                 }`}
               >
@@ -51,7 +51,7 @@ export default function Navbar() {
                 {isActive(link.href) && (
                   <motion.div
                     layoutId="activeNav"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.8)]"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600 shadow-[0_0_12px_rgba(147,51,234,0.8)]"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.3 }}
@@ -62,12 +62,12 @@ export default function Navbar() {
             
             {session ? (
               <>
-                {session.user.role !== 'customer' && (
+                {['admin', 'merchandiser', 'dealer'].includes(session.user.role) && (
                   <Link
                     href="/add-bike"
                     className={`text-sm font-medium transition-all relative py-1 px-1 ${
                       isActive("/add-bike")
-                        ? "text-cyan-400"
+                        ? "text-purple-600"
                         : "text-[#000080] hover:text-blue-700"
                     }`}
                   >
@@ -85,7 +85,7 @@ export default function Navbar() {
                   href="/my-orders"
                   className={`text-sm font-medium transition-all relative py-1 px-1 ${
                     isActive("/my-orders")
-                      ? "text-cyan-400"
+                      ? "text-purple-600"
                       : "text-[#000080] hover:text-blue-700"
                   }`}
                 >
@@ -99,26 +99,68 @@ export default function Navbar() {
                 </Link>
 
                 <div className="flex items-center space-x-4">
-                  <Link href="/wishlist" className="relative group p-2 hover:bg-blue-50 rounded-lg transition-all" title="Wishlist">
-                    <Heart className={`h-5 w-5 transition-colors ${isActive('/wishlist') ? 'text-primary' : 'text-[#000080] group-hover:text-blue-700'} ${wishlistCount > 0 ? 'fill-red-500 text-red-500' : ''}`} />
+                  <Link
+                    href="/wishlist"
+                    className={`relative py-1 px-1 transition-all ${
+                      isActive('/wishlist')
+                        ? "text-purple-600"
+                        : "text-[#000030] hover:text-blue-700"
+                    }`}
+                    title="Wishlist"
+                  >
+                    <Heart className={`h-5 w-5 ${wishlistCount > 0 ? 'fill-red-500 text-red-500' : ''}`} />
+                    {isActive('/wishlist') && (
+                      <motion.div
+                        layoutId="activeNav"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.8)]"
+                      />
+                    )}
                     {wishlistCount > 0 && (
-                      <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold">
                         {wishlistCount}
                       </span>
                     )}
                   </Link>
 
-                  <Link href="/cart" className="relative group p-2 hover:bg-blue-50 rounded-lg transition-all" title="Shopping Cart">
-                    <ShoppingCart className={`h-5 w-5 transition-colors ${isActive('/cart') ? 'text-primary' : 'text-[#000080] group-hover:text-primary'}`} />
+                  <Link
+                    href="/cart"
+                    className={`relative py-1 px-1 transition-all ${
+                      isActive('/cart')
+                        ? "text-purple-600"
+                        : "text-[#000080] hover:text-blue-700"
+                    }`}
+                    title="Shopping Cart"
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    {isActive('/cart') && (
+                      <motion.div
+                        layoutId="activeNav"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.8)]"
+                      />
+                    )}
                     {cartCount > 0 && (
-                      <span className="absolute top-1 right-1 bg-purple-600 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold border border-white">
+                      <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-bold border border-white">
                         {cartCount}
                       </span>
                     )}
                   </Link>
 
-                  <Link href="/dashboard" className="relative group p-2 hover:bg-blue-50 rounded-lg transition-colors" title="Dashboard">
-                    <LayoutDashboard className={`h-5 w-5 transition-colors ${isActive('/dashboard') ? 'text-primary' : 'text-[#000080] group-hover:text-primary'}`} />
+                  <Link
+                    href="/dashboard"
+                    className={`relative py-1 px-1 transition-all ${
+                      isActive('/dashboard')
+                        ? "text-purple-600"
+                        : "text-[#000080] hover:text-blue-700"
+                    }`}
+                    title="Dashboard"
+                  >
+                    <LayoutDashboard className="h-5 w-5" />
+                    {isActive('/dashboard') && (
+                      <motion.div
+                        layoutId="activeNav"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.8)]"
+                      />
+                    )}
                   </Link>
                 </div>
                 
@@ -156,7 +198,7 @@ export default function Navbar() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2"
+            className="lg:hidden p-2 text-[#000080]"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
           >
@@ -170,15 +212,15 @@ export default function Navbar() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t py-4 space-y-4">
+          <div className="lg:hidden absolute top-16 right-4 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 p-2 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`block py-2 text-sm font-medium transition-colors ${
+                className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   isActive(link.href)
-                    ? "text-cyan-400 font-bold"
-                    : "text-[#000080] hover:text-blue-700"
+                    ? "bg-purple-50 text-purple-700 font-bold"
+                    : "text-[#000080] hover:bg-gray-100 hover:text-blue-700"
                 }`}
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -188,12 +230,25 @@ export default function Navbar() {
             
             {session ? (
               <>
+                {['admin', 'merchandiser', 'dealer'].includes(session.user.role) && (
+                  <Link
+                    href="/add-bike"
+                    className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive("/add-bike")
+                        ? "bg-purple-50 text-purple-700 font-bold"
+                        : "text-[#000080] hover:bg-gray-100 hover:text-blue-700"
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Add Bike
+                  </Link>
+                )}
                 <Link
                   href="/dashboard"
-                  className={`block py-2 text-sm font-medium transition-colors ${
+                  className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive("/dashboard")
-                      ? "text-cyan-400 font-bold"
-                      : "text-[#000080] hover:text-blue-700"
+                      ? "bg-purple-50 text-purple-700 font-bold"
+                      : "text-[#000080] hover:bg-gray-100 hover:text-blue-700"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -201,10 +256,10 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/wishlist"
-                  className={`block py-2 text-sm font-medium transition-colors ${
+                  className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive("/wishlist")
-                      ? "text-cyan-400 font-bold"
-                      : "text-[#000080] hover:text-blue-700"
+                      ? "bg-purple-50 text-purple-700 font-bold"
+                      : "text-[#000080] hover:bg-gray-100 hover:text-blue-700"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -212,18 +267,18 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/cart"
-                  className={`block py-2 text-sm font-medium transition-colors ${
+                  className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive("/cart")
-                      ? "text-cyan-400 font-bold"
-                      : "text-[#000080] hover:text-blue-700"
+                      ? "bg-purple-50 text-purple-700 font-bold"
+                      : "text-[#000080] hover:bg-gray-100 hover:text-blue-700"
                   }`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Shopping Cart ({cartCount})
                 </Link>
                 <div className="pt-2 space-y-2">
-                  <p className="text-sm text-foreground/60">
-                    Logged in as: {session.user?.email}
+                  <p className="px-3 text-xs text-gray-500 font-medium truncate">
+                    {session.user?.email}
                   </p>
                   <Button
                     variant="outline"
@@ -232,7 +287,7 @@ export default function Navbar() {
                       signOut();
                       setMobileMenuOpen(false);
                     }}
-                    className="w-full gap-2"
+                    className="w-full gap-2 border-white/20 text-[#000080] hover:bg-blue-50"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout
@@ -242,12 +297,12 @@ export default function Navbar() {
             ) : (
               <div className="space-y-2">
                 <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="w-full">
+                  <Button variant="outline" size="sm" className="w-full border-white/20 text-[#000080] hover:bg-blue-50">
                     Sign Up
                   </Button>
                 </Link>
                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button size="sm" className="w-full gap-2">
+                  <Button size="sm" className="w-full gap-2 bg-[#000080] text-white hover:bg-blue-900">
                     <LogIn className="h-4 w-4" />
                     Login
                   </Button>

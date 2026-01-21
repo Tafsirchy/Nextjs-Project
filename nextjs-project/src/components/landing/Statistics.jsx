@@ -280,7 +280,7 @@ export default function Statistics() {
                 <motion.div 
                   animate={{ scale: [1, 1.02, 1] }}
                   transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className={`text-6xl md:text-7xl font-black text-zinc-900 mb-2 tracking-tighter transition-colors duration-500 ${stat.color.replace('text-', 'group-hover:text-')}`}
+                  className={`text-5xl md:text-6xl font-black text-zinc-900 mb-2 tracking-tighter transition-colors duration-500 ${stat.color.replace('text-', 'group-hover:text-')}`}
                 >
                   <CountUp value={stat.value} suffix={stat.suffix} />
                 </motion.div>

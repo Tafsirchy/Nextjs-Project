@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Package, Calendar, DollarSign, Eye, ShoppingBag } from "lucide-react";
+import { Package, Calendar, DollarSign, Eye, ShoppingBag, Truck } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -165,6 +165,14 @@ export default function MyOrdersPage() {
                           >
                             Cancel
                           </Button>
+                        )}
+                        {['confirmed', 'processing', 'shipped'].includes(order.status) && (
+                          <Link href="/dashboard?tab=orders">
+                            <Button className="bg-[#000080] hover:bg-blue-900 text-white border-0" size="sm">
+                              <Truck className="h-4 w-4 mr-2" />
+                              Track Order
+                            </Button>
+                          </Link>
                         )}
                         <Link href={`/my-orders/${order.orderNumber}`}>
                           <Button variant="outline" size="sm" className="gap-2">

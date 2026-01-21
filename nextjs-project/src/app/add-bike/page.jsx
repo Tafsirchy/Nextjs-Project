@@ -10,7 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { motion } from "framer-motion";
 import { uploadToImgBB } from "@/lib/imgbb";
+import { compressImage } from "@/lib/imageCompression";
 import { ImageIcon, X } from "lucide-react";
 import Image from "next/image";
 
@@ -48,20 +50,27 @@ export default function AddBikePage() {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Image too large (max 8MB)");
-      return;
-    }
-
     setUploading(true);
-    const result = await uploadToImgBB(file);
-    if (result.success) {
-      setFormData(prev => ({ ...prev, image: result.url }));
-      toast.success("Image uploaded!");
-    } else {
-      toast.error(result.message);
+    try {
+      // Step 1: Compress for speed
+      const compressedFile = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+      
+      console.log(`Original: ${(file.size / 1024 / 1024).toFixed(2)}MB, Compressed: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+
+      // Step 2: Upload optimized payload
+      const result = await uploadToImgBB(compressedFile);
+      if (result.success) {
+        setFormData(prev => ({ ...prev, image: result.url }));
+        toast.success("Telemetry Initialized!");
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to transmit image data");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   };
 
   async function handleSubmit(e) {
@@ -105,270 +114,300 @@ export default function AddBikePage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-12">
-      <div className="container mx-auto px-4 max-w-3xl">
-        {/* Back Button */}
-        <Link href="/bikes">
-          <Button variant="ghost" className="gap-2 mb-6">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Bikes
-          </Button>
-        </Link>
+  // Role Protection
+  const allowedRoles = ['admin', 'merchandiser', 'dealer'];
+  if (status === "unauthenticated" || (session?.user && !allowedRoles.includes(session.user.role))) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="max-w-md w-full text-center p-8">
+          <div className="bg-red-100 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="h-8 w-8 text-red-600" />
+          </div>
+          <CardTitle className="text-2xl mb-2">Access Denied</CardTitle>
+          <CardDescription className="mb-6">
+            You do not have the required permissions to access this protocol. 
+            This area is reserved for Administrators, Merchandisers, and Dealers.
+          </CardDescription>
+          <Link href="/">
+            <Button className="w-full">Return to Intelligence Hub</Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl">Add New Bike</CardTitle>
-            <CardDescription>
-              Fill in the details below to add a new motorcycle to the collection
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Basic Information</h3>
+  return (
+    <div className="relative min-h-screen flex items-center justify-center py-20 px-4 overflow-hidden bg-white">
+      {/* Subtle Light Tactical Background */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-tr from-slate-100/50 via-white to-blue-50/50" />
+        <div 
+          className="absolute inset-0 opacity-[0.03] grayscale"
+          style={{ 
+            backgroundImage: 'url("https://images.unsplash.com/photo-1558981403-c5f91bbde3c0?w=1600&q=80")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+        {/* Animated Glows - Softened for Light Mode */}
+        <motion.div 
+          animate={{ opacity: [0.3, 0.5, 0.3], scale: [1, 1.1, 1] }}
+          transition={{ duration: 10, repeat: Infinity }}
+          className="absolute top-1/4 -right-[10%] w-[500px] h-[500px] bg-cyan-100/50 rounded-full blur-[120px]" 
+        />
+        <motion.div 
+          animate={{ opacity: [0.3, 0.4, 0.3], scale: [1.1, 1, 1.1] }}
+          transition={{ duration: 8, repeat: Infinity, delay: 2 }}
+          className="absolute bottom-1/4 -left-[10%] w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[120px]" 
+        />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="relative z-10 w-full max-w-4xl"
+      >
+        {/* Header Section */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <Link href="/bikes" className="group flex items-center text-cyan-600/80 hover:text-cyan-700 transition-colors mb-4">
+              <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+              <span className="text-xs font-bold uppercase tracking-[0.2em]">Return to Hangar</span>
+            </Link>
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
+              INITIALIZE <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600">ASSET</span>
+            </h1>
+          </div>
+          <div className="hidden md:flex flex-col items-end">
+            <div className="bg-cyan-50/50 border border-cyan-200 rounded-full px-4 py-1 flex items-center gap-2 shadow-sm">
+              <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
+              <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-widest">Protocol Active</span>
+            </div>
+          </div>
+        </div>
+
+        <Card className="bg-white/80 backdrop-blur-xl border-slate-200 shadow-[0_10px_50px_-12px_rgba(0,0,0,0.1)] overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50" />
+          
+          <CardContent className="p-8 md:p-12">
+            <form onSubmit={handleSubmit} className="space-y-12">
+              {/* Section 1: Core Logistics */}
+              <div className="space-y-8">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 text-xs font-bold border border-cyan-200">01</span>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Core Logistics</h3>
+                </div>
                 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-8">
                   <div className="space-y-2">
-                    <label htmlFor="name" className="text-sm font-medium">
-                      Bike Name <span className="text-red-500">*</span>
-                    </label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Asset Designation</label>
                     <Input
-                      id="name"
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="e.g., Thunder Strike 3000"
+                      placeholder="e.g., PHANTOM GT-X"
                       required
+                      className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-300 h-12 text-lg focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/10 rounded-xl transition-all"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label htmlFor="category" className="text-sm font-medium">
-                      Category <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="category"
-                      name="category"
-                      value={formData.category}
-                      onChange={handleChange}
-                      required
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Fleet Category</label>
+                    <div className="relative">
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        required
+                        className="flex h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500/50 appearance-none transition-all"
+                      >
+                        {categories.map(cat => (
+                          <option key={cat} value={cat} className="bg-white">{cat}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
+                        <ArrowLeft className="h-4 w-4 rotate-[270deg] text-slate-400" />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <label htmlFor="price" className="text-sm font-medium">
-                      Price (USD) <span className="text-red-500">*</span>
-                    </label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Unit Valuation</label>
                     <Input
-                      id="price"
                       name="price"
                       type="number"
                       value={formData.price}
                       onChange={handleChange}
-                      placeholder="e.g., 12999"
+                      placeholder="Pricing"
                       required
-                      min="0"
-                      step="0.01"
+                      className="bg-slate-50 border-slate-200 text-slate-900 h-12 focus:border-cyan-500/50 rounded-xl"
                     />
                   </div>
-
                   <div className="space-y-2">
-                    <label htmlFor="stock" className="text-sm font-medium">
-                      Stock Quantity <span className="text-red-500">*</span>
-                    </label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Reserve Units</label>
                     <Input
-                      id="stock"
                       name="stock"
                       type="number"
                       value={formData.stock}
                       onChange={handleChange}
-                      placeholder="e.g., 10"
+                      placeholder="Stock"
                       required
-                      min="0"
+                      className="bg-slate-50 border-slate-200 text-slate-900 h-12 focus:border-cyan-500/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Asset Synopsis</label>
+                    <Input
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      placeholder="Tactical summary of the asset..."
+                      required
+                      className="bg-slate-50 border-slate-200 text-slate-900 h-12 focus:border-cyan-500/50 rounded-xl"
                     />
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="description" className="text-sm font-medium">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    placeholder="Describe the bike's key features and selling points..."
-                    required
-                    rows={4}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
+              {/* Section 2: Visual Telemetry */}
+              <div className="space-y-8">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 text-xs font-bold border border-blue-200">02</span>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Visual Telemetry</h3>
                 </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="image" className="text-sm font-medium">
-                    Bike Image <span className="text-red-500">*</span>
-                  </label>
+                <div className="relative group">
                   {formData.image ? (
-                     <div className="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-slate-200">
-                        <Image src={formData.image} alt="Bike Preview" fill className="object-cover" />
-                        <button 
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, image: "" }))}
-                          className="absolute top-2 right-2 bg-white rounded-full p-2 shadow-lg hover:bg-red-50 group z-10"
-                        >
-                          <X className="h-5 w-5 text-slate-500 group-hover:text-red-500" />
-                        </button>
-                     </div>
+                    <motion.div 
+                      initial={{ scale: 0.95, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="relative w-full h-80 rounded-2xl overflow-hidden border border-slate-200 shadow-xl"
+                    >
+                      <Image src={formData.image} alt="Telemetry" fill className="object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                      <button 
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, image: "" }))}
+                        className="absolute top-4 right-4 bg-white/80 backdrop-blur-md border border-slate-200 rounded-full p-2 hover:bg-red-50 hover:border-red-200 transition-all group shadow-lg"
+                      >
+                        <X className="h-5 w-5 text-slate-600 group-hover:text-red-600 transition-colors" />
+                      </button>
+                      <div className="absolute bottom-6 left-6">
+                        <span className="text-[10px] font-bold text-white uppercase tracking-widest bg-cyan-600/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">Telemetry Verified</span>
+                      </div>
+                    </motion.div>
                   ) : (
-                     <label className="flex flex-col items-center justify-center w-full aspect-video border-2 border-dashed rounded-xl cursor-pointer hover:bg-slate-50 hover:border-purple-300 transition-all">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                           <ImageIcon className="h-12 w-12 text-slate-400 mb-3" />
-                           <p className="text-sm text-slate-500">
-                             {uploading ? "Uploading..." : "Click to upload bike image or drag and drop"}
-                           </p>
-                           <p className="text-xs text-slate-400 mt-1">PNG, JPG or WEBP (MAX. 8MB)</p>
-                        </div>
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*" 
-                          onChange={handleImageUpload}
-                          disabled={uploading}
-                        />
-                     </label>
+                    <label className="flex flex-col items-center justify-center w-full h-80 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:bg-white hover:border-cyan-500/50 transition-all duration-500 group shadow-inner">
+                      <div className="p-6 rounded-2xl bg-white mb-4 group-hover:scale-110 group-hover:shadow-md transition-all">
+                        <ImageIcon className="h-10 w-10 text-cyan-500/50 group-hover:text-cyan-600 transition-colors" />
+                      </div>
+                      <p className="text-sm text-slate-600 font-bold">
+                        {uploading ? "Uploading Data Stream..." : "Deploy Image Payload"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] mt-2">Maximum Weight: 8MB</p>
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                      />
+                    </label>
                   )}
                   <input type="hidden" name="image" value={formData.image} required />
                 </div>
               </div>
 
-              {/* Technical Specifications */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Technical Specifications</h3>
-                
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="engine" className="text-sm font-medium">
-                      Engine
-                    </label>
-                    <Input
-                      id="engine"
-                      name="engine"
-                      value={formData.engine}
-                      onChange={handleChange}
-                      placeholder="e.g., 998cc Inline-4"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="power" className="text-sm font-medium">
-                      Power
-                    </label>
-                    <Input
-                      id="power"
-                      name="power"
-                      value={formData.power}
-                      onChange={handleChange}
-                      placeholder="e.g., 200 HP"
-                    />
-                  </div>
+              {/* Section 3: Performance Matrix */}
+              <div className="space-y-8">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-100 text-purple-600 text-xs font-bold border border-purple-200">03</span>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Performance Matrix</h3>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  {[
+                    { label: "Propulsion", name: "engine", placeholder: "e.g., 998cc V4" },
+                    { label: "Output", name: "power", placeholder: "e.g., 215 HP" },
+                    { label: "Velocity Max", name: "topSpeed", placeholder: "e.g., 320 KM/H" },
+                    { label: "Mass", name: "weight", placeholder: "e.g., 185 KG" }
+                  ].map((spec) => (
+                    <div key={spec.name} className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{spec.label}</label>
+                      <Input
+                        name={spec.name}
+                        value={formData[spec.name]}
+                        onChange={handleChange}
+                        placeholder={spec.placeholder}
+                        className="bg-slate-50 border-slate-200 text-slate-900 h-10 focus:border-purple-500/50 rounded-xl placeholder:text-slate-300 text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-8 pt-4">
                   <div className="space-y-2">
-                    <label htmlFor="topSpeed" className="text-sm font-medium">
-                      Top Speed
-                    </label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Integrated Systems (Features)</label>
                     <Input
-                      id="topSpeed"
-                      name="topSpeed"
-                      value={formData.topSpeed}
+                      name="features"
+                      value={formData.features}
                       onChange={handleChange}
-                      placeholder="e.g., 186 mph"
+                      placeholder="ABS, Traction Control, Quickshifter..."
+                      className="bg-slate-50 border-slate-200 text-slate-900 h-12 focus:border-purple-500/50 rounded-xl text-xs"
                     />
                   </div>
-
                   <div className="space-y-2">
-                    <label htmlFor="weight" className="text-sm font-medium">
-                      Weight
-                    </label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Chroma Options (Colors)</label>
                     <Input
-                      id="weight"
-                      name="weight"
-                      value={formData.weight}
+                      name="colors"
+                      value={formData.colors}
                       onChange={handleChange}
-                      placeholder="e.g., 199 kg"
+                      placeholder="Obsidian, Crimson, Cobalt..."
+                      className="bg-slate-50 border-slate-200 text-slate-900 h-12 focus:border-purple-500/50 rounded-xl text-xs"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Additional Details */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Additional Details</h3>
-                
-                <div className="space-y-2">
-                  <label htmlFor="features" className="text-sm font-medium">
-                    Features
-                  </label>
-                  <Input
-                    id="features"
-                    name="features"
-                    value={formData.features}
-                    onChange={handleChange}
-                    placeholder="e.g., ABS Braking, LED Lighting, Digital Display"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Separate features with commas
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="colors" className="text-sm font-medium">
-                    Available Colors
-                  </label>
-                  <Input
-                    id="colors"
-                    name="colors"
-                    value={formData.colors}
-                    onChange={handleChange}
-                    placeholder="e.g., Black, Red, Blue"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Separate colors with commas
-                  </p>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex gap-4 pt-6">
+              {/* Action Array */}
+              <div className="flex flex-col md:flex-row gap-4 pt-12 border-t border-slate-100">
                 <Button
                   type="submit"
-                  className="flex-1 bike-gradient-alt text-white border-0"
-                  size="lg"
-                  disabled={loading}
+                  disabled={loading || uploading}
+                  className="flex-1 h-14 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black text-lg tracking-widest uppercase rounded-2xl shadow-xl shadow-cyan-500/30 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Adding Bike..." : "Add Bike"}
+                  {loading ? (
+                    <div className="flex items-center gap-3">
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Transmitting...</span>
+                    </div>
+                  ) : uploading ? (
+                    "Uploading..."
+                  ) : "Initialize Asset"}
                 </Button>
                 <Link href="/bikes" className="flex-1">
-                  <Button type="button" variant="outline" size="lg" className="w-full">
-                    Cancel
+                  <Button type="button" variant="outline" className="w-full h-14 bg-white border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-900 text-lg font-bold uppercase tracking-widest rounded-2xl transition-all shadow-sm">
+                    Abort Procedure
                   </Button>
                 </Link>
               </div>
             </form>
           </CardContent>
         </Card>
-      </div>
+
+        {/* Debug/Status Footer */}
+        <div className="mt-8 flex justify-center gap-8">
+           <div className="flex items-center gap-2 opacity-20 hover:opacity-100 transition-opacity">
+              <span className="text-[10px] font-bold text-slate-900 uppercase tracking-[0.3em]">Encrypted Channel</span>
+           </div>
+           <div className="flex items-center gap-2 opacity-20 hover:opacity-100 transition-opacity">
+              <span className="text-[10px] font-bold text-slate-900 uppercase tracking-[0.3em]">Hangar Rev 3.5</span>
+           </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

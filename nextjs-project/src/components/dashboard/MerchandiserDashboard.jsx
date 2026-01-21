@@ -5,7 +5,23 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, Plus, DollarSign, Users, ShoppingCart, ArrowRight, BarChart3, Award, MessageSquare, Star, Trash2, CheckCircle, Edit } from "lucide-react";
+import { 
+  Package, 
+  Plus, 
+  DollarSign, 
+  Users, 
+  ShoppingCart, 
+  ArrowRight, 
+  BarChart3, 
+  Award, 
+  MessageSquare, 
+  Star, 
+  Trash2, 
+  CheckCircle, 
+  Edit,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -28,6 +44,10 @@ export default function MerchandiserDashboard({ user }) {
   const [updating, setUpdating] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [bulkJson, setBulkJson] = useState("");
+  
+  // Pagination
+  const [ordersPage, setOrdersPage] = useState(1);
+  const pageSize = 10;
 
   const fetchAdminData = useCallback(async () => {
     try {
@@ -287,51 +307,100 @@ export default function MerchandiserDashboard({ user }) {
                 {recentOrders.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">No orders recorded</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[640px]">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 font-semibold">Order ID</th>
-                          <th className="text-left py-3 font-semibold">Customer</th>
-                          <th className="text-left py-3 font-semibold">Total</th>
-                          <th className="text-left py-3 font-semibold">Status</th>
-                          <th className="text-right py-3 font-semibold">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recentOrders.map((order) => (
-                          <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50">
-                            <td className="py-4 font-medium">{order.orderNumber}</td>
-                            <td className="py-4 text-muted-foreground truncate max-w-[150px]">{order.userEmail}</td>
-                            <td className="py-4 font-bold">${order.total.toLocaleString()}</td>
-                            <td className="py-4">
-                              <select 
-                                value={order.status}
-                                onChange={(e) => handleStatusUpdate(order.orderNumber, e.target.value)}
-                                className={`px-2 py-1 rounded-md text-xs font-medium border-0 focus:ring-2 focus:ring-purple-500 cursor-pointer ${
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm min-w-[640px]">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-3 font-semibold">Order ID</th>
+                            <th className="text-left py-3 font-semibold">Customer</th>
+                            <th className="text-left py-3 font-semibold">Total</th>
+                            <th className="text-left py-3 font-semibold">Status</th>
+                            <th className="text-center py-3 font-semibold">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentOrders.slice((ordersPage - 1) * pageSize, ordersPage * pageSize).map((order) => (
+                            <tr key={order.id} className="border-b last:border-0 hover:bg-gray-50">
+                              <td className="py-4 font-medium">{order.orderNumber}</td>
+                              <td className="py-4 text-muted-foreground truncate max-w-[150px]">{order.userEmail}</td>
+                              <td className="py-4 font-bold">${order.total.toLocaleString()}</td>
+                              <td className="py-4">
+                                <select 
+                                  value={order.status}
+                                  onChange={(e) => handleStatusUpdate(order.orderNumber, e.target.value)}
+                                  className={`px-2 py-1 rounded-md text-xs font-medium border-0 focus:ring-2 focus:ring-purple-500 cursor-pointer ${
                                   order.status === 'delivered' ? 'bg-green-100 text-green-700' : 
                                   order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                  order.status === 'shipped' ? 'bg-indigo-100 text-indigo-700' :
+                                  order.status === 'processing' ? 'bg-amber-100 text-amber-700' :
                                   'bg-blue-100 text-blue-700'
                                 }`}
+                                >
+                                  <option value="confirmed">Confirmed</option>
+                                  <option value="processing">Processing</option>
+                                  <option value="shipped">Shipped</option>
+                                  <option value="delivered">Delivered</option>
+                                  <option value="cancelled">Cancelled</option>
+                                </select>
+                              </td>
+                              <td className="py-4 text-right">
+                                 <Link href={`/order-confirmation/${order.orderNumber}`}>
+                                   <Button variant="ghost" size="sm">Details</Button>
+                                 </Link>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Orders Pagination Controls */}
+                    {recentOrders.length > pageSize && (
+                      <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 font-medium">
+                          Showing <span className="text-slate-900">{(ordersPage - 1) * pageSize + 1}</span> to <span className="text-slate-900">{Math.min(ordersPage * pageSize, recentOrders.length)}</span> of <span className="text-slate-900">{recentOrders.length}</span> platform orders
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setOrdersPage(prev => Math.max(prev - 1, 1))}
+                            disabled={ordersPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <div className="flex items-center gap-1">
+                            {[...Array(Math.ceil(recentOrders.length / pageSize))].map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => setOrdersPage(i + 1)}
+                                className={`h-8 w-8 rounded text-xs font-bold transition-all ${
+                                  ordersPage === i + 1 
+                                    ? "bg-purple-600 text-white shadow-md shadow-purple-200" 
+                                    : "text-slate-600 hover:bg-slate-100"
+                                }`}
                               >
-                                <option value="confirmed">Confirmed</option>
-                                <option value="processing">Processing</option>
-                                <option value="shipped">Shipped</option>
-                                <option value="delivered">Delivered</option>
-                                <option value="cancelled">Cancelled</option>
-                              </select>
-                            </td>
-                            <td className="py-4 text-right">
-                               <Link href={`/order-confirmation/${order.orderNumber}`}>
-                                 <Button variant="ghost" size="sm">Details</Button>
-                               </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                {i + 1}
+                              </button>
+                            ))}
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => setOrdersPage(prev => Math.min(prev + 1, Math.ceil(recentOrders.length / pageSize)))}
+                            disabled={ordersPage === Math.ceil(recentOrders.length / pageSize)}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
+
               </CardContent>
             </Card>
           ) : activeTab === 'inventory' ? (

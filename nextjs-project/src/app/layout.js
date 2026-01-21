@@ -26,7 +26,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${syncopate.variable} antialiased min-h-screen flex flex-col`}>
+      <body className={`${inter.variable} ${syncopate.variable} antialiased min-h-screen flex flex-col`} suppressHydrationWarning>
         <SmoothScroll>
           <Providers>
             <Navbar />

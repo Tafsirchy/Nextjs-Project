@@ -1,5 +1,6 @@
 import { API_URL } from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import BikeCard from "@/components/BikeCard";
 import { useCart } from "@/contexts/CartContext";
 
 export default function CustomerDashboard({ user }) {
+  const searchParams = useSearchParams();
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -125,6 +127,14 @@ export default function CustomerDashboard({ user }) {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // Handle tab parameter from URL
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'orders', 'wishlist', 'addresses', 'reviews'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (activeTab === 'addresses') fetchAddresses();

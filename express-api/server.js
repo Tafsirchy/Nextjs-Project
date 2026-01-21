@@ -6,17 +6,58 @@ const { connectToDatabase } = require('./db');
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_51O...[PLACEHOLDER]...';
 console.log('Stripe Secret Key loaded (prefix):', STRIPE_SECRET_KEY.substring(0, 10));
 const stripe = require('stripe')(STRIPE_SECRET_KEY);
+const emailjs = require('@emailjs/nodejs');
 
 const app = express();
 app.use(cors());
 const PORT = process.env.PORT || 5000;
-// Mock Email Service
-const sendEmail = (to, subject, htmlBody) => {
-  console.log('--------------------------------------------------');
-  console.log(`MOCK EMAIL SENT TO: ${to}`);
-  console.log(`SUBJECT: ${subject}`);
-  console.log(`BODY (HTML Preview): ${htmlBody.substring(0, 100)}...`);
-  console.log('--------------------------------------------------');
+
+// EmailJS Configuration
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY;
+const EMAILJS_PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY;
+
+// Email Service using EmailJS
+const sendEmail = async (to, subject, htmlBody) => {
+  try {
+    // If EmailJS is not configured, fall back to console logging
+    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+      console.log('--------------------------------------------------');
+      console.log('EmailJS NOT CONFIGURED - Using Mock Mode');
+      console.log(`MOCK EMAIL SENT TO: ${to}`);
+      console.log(`SUBJECT: ${subject}`);
+      console.log(`BODY (HTML Preview): ${htmlBody.substring(0, 100)}...`);
+      console.log('--------------------------------------------------');
+      return { success: true, mock: true };
+    }
+
+    // Send email using EmailJS
+    const response = await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      {
+        to_email: to,
+        subject: subject,
+        message_html: htmlBody,
+        to_name: to.split('@')[0], // Extract name from email
+      },
+      {
+        publicKey: EMAILJS_PUBLIC_KEY,
+        privateKey: EMAILJS_PRIVATE_KEY,
+      }
+    );
+
+    console.log(`✅ Email sent successfully to ${to} via EmailJS`);
+    return { success: true, response };
+    
+  } catch (error) {
+    // EmailJS errors often contain a .text property with the actual error message
+    const errorMsg = error.text || error.message || 'Unknown error';
+    console.error('❌ Error sending email via EmailJS:', errorMsg);
+    if (error.stack) console.error(error.stack);
+    throw error;
+  }
 };
 
 const generateOrderEmail = (order) => {
@@ -89,6 +130,54 @@ const generateOrderEmail = (order) => {
 
         <p style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">
           Detailed tracking information will be sent in a separate email when your item ships.
+        </p>
+      </div>
+    </div>
+  `;
+};
+
+// Generate Order Status Update Email
+const generateStatusUpdateEmail = (order, newStatus) => {
+  const statusMessages = {
+    confirmed: 'Your order has been confirmed and will be processed soon.',
+    processing: 'Your order is now being processed and prepared for shipment.',
+    shipped: 'Great news! Your order has been shipped and is on its way to you.',
+    delivered: 'Your order has been successfully delivered. Thank you for shopping with us!',
+    cancelled: 'Your order has been cancelled. If you have any questions, please contact support.'
+  };
+
+  const statusColors = {
+    confirmed: '#3b82f6',
+    processing: '#f59e0b',
+    shipped: '#8b5cf6',
+    delivered: '#10b981',
+    cancelled: '#ef4444'
+  };
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center; color: white;">
+        <h1 style="margin: 0;">Order Status Update</h1>
+        <p style="margin: 5px 0 0;">Order #${order.orderNumber}</p>
+      </div>
+      
+      <div style="padding: 20px;">
+        <div style="background-color: ${statusColors[newStatus] || '#3b82f6'}; color: white; padding: 15px; border-radius: 6px; text-align: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; text-transform: uppercase;">${newStatus}</h2>
+        </div>
+        
+        <p style="font-size: 16px; color: #333;">${statusMessages[newStatus] || 'Your order status has been updated.'}</p>
+        
+        <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-radius: 6px;">
+          <h3 style="margin-top: 0;">Order Summary</h3>
+          <p style="margin: 5px 0;"><strong>Order Number:</strong> ${order.orderNumber}</p>
+          <p style="margin: 5px 0;"><strong>Order Date:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
+          <p style="margin: 5px 0;"><strong>Total Amount:</strong> $${order.total.toLocaleString()}</p>
+          <p style="margin: 5px 0;"><strong>Items:</strong> ${order.items?.length || 0} item(s)</p>
+        </div>
+        
+        <p style="text-align: center; color: #999; font-size: 12px; margin-top: 30px;">
+          Thank you for choosing MotruBi. If you have any questions, please don't hesitate to contact us.
         </p>
       </div>
     </div>
@@ -168,11 +257,43 @@ app.get('/api/bikes', async (req, res) => {
       ];
     }
     
-    const bikes = await db.collection('bikes').find(query).toArray();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9;
+    const skip = (page - 1) * limit;
+    const sortParam = req.query.sort || 'featured';
+    
+    // Determine sort order
+    let sortOrder = {};
+    switch (sortParam) {
+      case 'price-asc':
+        sortOrder = { price: 1, _id: 1 };
+        break;
+      case 'price-desc':
+        sortOrder = { price: -1, _id: -1 };
+        break;
+      case 'newest':
+        // Use _id for newest (MongoDB ObjectId contains timestamp)
+        sortOrder = { _id: -1 };
+        break;
+      case 'featured':
+      default:
+        // Sort by featured if it exists, otherwise by _id
+        sortOrder = { featured: -1, _id: -1 };
+    }
+
+    const totalBikes = await db.collection('bikes').countDocuments(query);
+    const bikes = await db.collection('bikes').find(query).sort(sortOrder).skip(skip).limit(limit).toArray();
     
     res.json({
       success: true,
       count: bikes.length,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalBikes / limit),
+        totalBikes,
+        hasNextPage: page * limit < totalBikes,
+        hasPrevPage: page > 1
+      },
       bikes: bikes
     });
   } catch (error) {
@@ -253,11 +374,15 @@ app.post('/api/bikes', async (req, res) => {
   try {
     const { name, category, price, description, image, stock, engine, power, topSpeed, weight, features, colors } = req.body;
     const creatorEmail = req.headers.authorization?.replace('Bearer ', '');
+    const db = await connectToDatabase();
     
-    if (!creatorEmail) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    // Authorization: Only admin, merchandiser, and dealer can create bikes
+    const user = await db.collection('users').findOne({ email: creatorEmail.toLowerCase() });
+    const allowedRoles = ['admin', 'merchandiser', 'dealer'];
+    if (!user || !allowedRoles.includes(user.role)) {
+      return res.status(403).json({ success: false, message: 'Access denied: Unauthorized role' });
     }
-    
+
     // Validation
     if (!name || !category || !price || !description) {
       return res.status(400).json({
@@ -265,8 +390,6 @@ app.post('/api/bikes', async (req, res) => {
         message: 'Missing required fields: name, category, price, description'
       });
     }
-    
-    const db = await connectToDatabase();
     
     // Generate new ID (find max ID and increment)
     const lastBike = await db.collection('bikes').find().sort({ id: -1 }).limit(1).toArray();
@@ -745,6 +868,96 @@ app.put('/api/dealer/info', async (req, res) => {
   }
 });
 
+// Get dealer billing statements
+app.get('/api/dealer/statements', async (req, res) => {
+  try {
+    const userEmail = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!userEmail) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const db = await connectToDatabase();
+    
+    // Verify user is a dealer
+    const user = await db.collection('users').findOne({ email: userEmail });
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    if (user.role !== 'dealer') {
+      return res.status(403).json({ success: false, message: 'Only dealers can access billing statements' });
+    }
+
+    // Fetch all orders for this dealer
+    const orders = await db.collection('orders').find({ userEmail }).sort({ createdAt: -1 }).toArray();
+    
+    if (orders.length === 0) {
+      return res.json({ success: true, statements: [] });
+    }
+
+    // Group orders by month
+    const statementsByMonth = {};
+    
+    orders.forEach(order => {
+      const orderDate = new Date(order.createdAt);
+      const monthKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!statementsByMonth[monthKey]) {
+        statementsByMonth[monthKey] = {
+          month: monthKey,
+          monthName: orderDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          orders: [],
+          totalAmount: 0,
+          orderCount: 0,
+          totalSavings: 0
+        };
+      }
+      
+      statementsByMonth[monthKey].orders.push({
+        orderNumber: order.orderNumber,
+        date: order.createdAt,
+        total: order.total,
+        discount: order.discount || 0,
+        itemCount: order.items?.length || 0
+      });
+      
+      statementsByMonth[monthKey].totalAmount += order.total;
+      statementsByMonth[monthKey].totalSavings += (order.discount || 0);
+      statementsByMonth[monthKey].orderCount++;
+    });
+
+    // Convert to array and calculate due dates (NET-30 terms)
+    const statements = Object.values(statementsByMonth).map(statement => {
+      const [year, month] = statement.month.split('-');
+      // Due date is last day of following month
+      const dueDate = new Date(parseInt(year), parseInt(month), 0); // Last day of the month after order month
+      const today = new Date();
+      const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+      
+      return {
+        ...statement,
+        dueDate: dueDate.toISOString().split('T')[0],
+        daysUntilDue: daysUntilDue > 0 ? daysUntilDue : 0,
+        isPastDue: daysUntilDue < 0
+      };
+    });
+
+    // Sort by month (newest first)
+    statements.sort((a, b) => b.month.localeCompare(a.month));
+
+    res.json({
+      success: true,
+      statements,
+      totalStatements: statements.length
+    });
+  } catch (error) {
+    console.error('Error fetching dealer statements:', error);
+    res.status(500).json({ success: false, message: 'Error fetching billing statements', error: error.message });
+  }
+});
+
 // Addresses
 app.get('/api/user/addresses', async (req, res) => {
   try {
@@ -975,18 +1188,57 @@ app.get('/api/admin/stats', async (req, res) => {
     const users = await db.collection('users').find({}).toArray();
     const bikes = await db.collection('bikes').find({}).toArray();
 
+    // Map bikes and categories
+    const bikeCategoryMap = bikes.reduce((acc, b) => {
+      acc[b.id] = b.category;
+      return acc;
+    }, {});
+
     const totalSales = orders.reduce((sum, o) => sum + o.total, 0);
     const totalOrders = orders.length;
     const totalUsers = users.length;
     const totalBikes = bikes.length;
     const totalInventory = bikes.reduce((sum, b) => sum + b.stock, 0);
+    const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
-    // Group sales by day
-    const salesByDay = orders.reduce((acc, o) => {
+    // Detailed Revenue Analytics
+    const salesByDay = {};
+    const salesByMonth = {};
+    const revenueByCategory = {};
+    const productSales = {};
+
+    orders.forEach(o => {
       const date = o.createdAt.split('T')[0];
-      acc[date] = (acc[date] || 0) + o.total;
-      return acc;
-    }, {});
+      const month = date.substring(0, 7); // YYYY-MM
+      
+      // Daily Sales
+      salesByDay[date] = (salesByDay[date] || 0) + o.total;
+      
+      // Monthly Sales
+      salesByMonth[month] = (salesByMonth[month] || 0) + o.total;
+
+      // Item level analysis
+      o.items.forEach(item => {
+        const category = bikeCategoryMap[item.bikeId] || 'Unknown';
+        revenueByCategory[category] = (revenueByCategory[category] || 0) + (item.subtotal || 0);
+
+        // Track product popularity
+        if (!productSales[item.bikeId]) {
+          productSales[item.bikeId] = {
+            name: item.bikeName,
+            quantity: 0,
+            revenue: 0
+          };
+        }
+        productSales[item.bikeId].quantity += item.quantity;
+        productSales[item.bikeId].revenue += (item.subtotal || 0);
+      });
+    });
+
+    // Get Top 5 Products
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
 
     res.json({
       success: true,
@@ -996,10 +1248,15 @@ app.get('/api/admin/stats', async (req, res) => {
         totalUsers,
         totalBikes,
         totalInventory,
-        salesByDay
+        averageOrderValue,
+        salesByDay,
+        salesByMonth,
+        revenueByCategory,
+        topProducts
       }
     });
   } catch (error) {
+    console.error('Stats error:', error);
     res.status(500).json({ success: false, message: 'Error fetching stats' });
   }
 });
@@ -1644,15 +1901,6 @@ app.post('/api/promos/validate', async (req, res) => {
   }
 });
 
-// Duplicate route removed (1/2)
-
-// ============================================
-// ORDERS ROUTES
-// ============================================
-
-// ============================================
-// Duplicate route removed (2/2)
-
 // Create new order
 app.post('/api/orders/create', async (req, res) => {
 
@@ -1726,14 +1974,19 @@ app.post('/api/orders/create', async (req, res) => {
     // Clear user's cart after order
     await db.collection('cart').deleteMany({ userEmail: authEmail });
 
-    // Send confirmation email
+    // Send confirmation email (don't block order creation if email fails)
     const emailHeader = paymentMethod === 'cod' ? 'Order Invoice (COD)' : 'Order Invoice & Confirmation';
     const emailHtml = generateOrderEmail(newOrder);
+    
+    // Send email asynchronously without blocking the response
     sendEmail(
       authEmail, 
       `${emailHeader} - #${orderNumber}`, 
       emailHtml
-    );
+    ).catch(err => {
+      console.error('⚠️ Failed to send order confirmation email:', err.message);
+      // Continue anyway - order was created successfully
+    });
 
     res.status(201).json({
       success: true,
@@ -1826,6 +2079,47 @@ app.get('/api/orders/:orderNumber', async (req, res) => {
   }
 });
 
+// Resend order confirmation email
+app.post('/api/orders/:orderNumber/email', async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    const userEmail = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!userEmail) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const db = await connectToDatabase();
+    const order = await db.collection('orders').findOne({ orderNumber });
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    
+    // Verify authorization
+    const user = await db.collection('users').findOne({ email: userEmail });
+    const isAuthorized = order.userEmail === userEmail || 
+                         (user && ['admin', 'merchandiser'].includes(user.role));
+    
+    if (!isAuthorized) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    
+    // Generate and send email
+    const emailHtml = generateOrderEmail(order);
+    const recipient = order.shippingAddress?.email || order.userEmail;
+    
+    await sendEmail(recipient, `Order Confirmation - ${order.orderNumber}`, emailHtml);
+    
+    console.log(`📧 Email sent for order ${orderNumber} to ${recipient}`);
+    res.json({ success: true, message: 'Email sent successfully', sentTo: recipient });
+    
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ success: false, message: 'Error sending email' });
+  }
+});
+
 // Update order status (e.g., cancel, process, ship, deliver)
 app.post('/api/orders/status/:orderNumber', async (req, res) => {
   try {
@@ -1858,19 +2152,19 @@ app.post('/api/orders/status/:orderNumber', async (req, res) => {
       });
     }
 
-    // Basic authorization: only owner can cancel, admin can change any status
+    // Basic authorization: only owner can cancel, admin/merchandiser can change any status
     const user = await db.collection('users').findOne({ email: userEmail });
-    const isAdmin = user && user.role === 'admin';
+    const isStaff = user && (user.role === 'admin' || user.role === 'merchandiser');
 
-    if (order.userEmail !== userEmail && !isAdmin) {
+    if (order.userEmail !== userEmail && !isStaff) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this order status'
       });
     }
 
-    // Specific logic for 'cancelled' status if not admin
-    if (status === 'cancelled' && !isAdmin) {
+    // Specific logic for 'cancelled' status if not staff
+    if (status === 'cancelled' && !isStaff) {
       if (!['confirmed', 'processing'].includes(order.status)) {
         return res.status(400).json({
           success: false,
@@ -1879,28 +2173,45 @@ app.post('/api/orders/status/:orderNumber', async (req, res) => {
       }
     }
 
-    // Update status
+    // Prepare tracking update
+    const trackingEntry = {
+      status: status,
+      label: `Order ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      timestamp: new Date().toISOString(),
+      completed: true
+    };
+
+    // Update status and tracking
     await db.collection('orders').updateOne(
       { orderNumber },
       { 
         $set: { 
           status,
           updatedAt: new Date().toISOString()
+        },
+        $push: {
+          tracking: trackingEntry
         }
       }
     );
 
-    // Send status update email
+    // Send status update email (don't block status update if email fails)
+    const statusEmailHtml = generateStatusUpdateEmail(order, status);
     sendEmail(
-      data.orders[orderIndex].userEmail,
-      `Order Update - #${orderNumber}`,
-      `Your order #${orderNumber} status has been updated to: ${status.toUpperCase()}`
-    );
+      order.userEmail,
+      `Order Status Update - #${orderNumber}`,
+      statusEmailHtml
+    ).catch(err => {
+      console.error('⚠️ Failed to send status update email:', err.message);
+      // Continue anyway - status was updated successfully
+    });
+
+    const updatedOrder = await db.collection('orders').findOne({ orderNumber });
 
     res.json({
       success: true,
       message: 'Order status updated successfully',
-      order: data.orders[orderIndex]
+      order: updatedOrder
     });
   } catch (error) {
     res.status(500).json({
@@ -1911,47 +2222,13 @@ app.post('/api/orders/status/:orderNumber', async (req, res) => {
   }
 });
 
-// Resend Order Invoice Email
-app.post('/api/orders/:orderNumber/email', async (req, res) => {
-  try {
-    const { orderNumber } = req.params;
-    const userEmail = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!userEmail) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
+// ============================================
+// DUPLICATE ENDPOINT REMOVED
+// The correct endpoint is at line 2027
+// ============================================
 
-    const db = await connectToDatabase();
-    const order = await db.collection('orders').findOne({ orderNumber });
+// (Removed duplicate /api/orders/:orderNumber/email endpoint)
 
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    if (order.userEmail !== userEmail) {
-      return res.status(403).json({ success: false, message: 'Not authorized' });
-    }
-
-    const emailHtml = generateOrderEmail(order);
-    sendEmail(
-      userEmail,
-      `Invoice: Order #${orderNumber}`,
-      emailHtml
-    );
-
-    res.json({
-      success: true,
-      message: 'Invoice sent successfully'
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error sending email',
-      error: error.message
-    });
-  }
-});
 
 // Get all orders (admin only - for now, any authenticated user)
 app.get('/api/admin/orders', async (req, res) => {
