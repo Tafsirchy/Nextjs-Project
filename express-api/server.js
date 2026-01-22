@@ -1776,7 +1776,8 @@ app.get('/api/promos/active', async (req, res) => {
       active: true,
       $or: [
         { expiresAt: { $exists: false } },
-        { expiresAt: { $gt: new Date() } }
+        { expiresAt: { $gt: new Date() } },
+        { expiresAt: { $gt: new Date().toISOString() } }
       ]
     }).toArray();
     
@@ -1827,7 +1828,15 @@ app.post('/api/admin/promos', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Promo code already exists' });
     }
 
-    const newPromo = { code, discount, type, description, expiresAt };
+    const newPromo = { 
+      code, 
+      discount: parseFloat(discount), 
+      type, 
+      description, 
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
     await db.collection('promos').insertOne(newPromo);
 
     res.json({ success: true, message: 'Promo created', promo: newPromo });

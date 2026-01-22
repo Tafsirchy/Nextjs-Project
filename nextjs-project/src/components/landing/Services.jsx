@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bike, Package, Truck, Wrench, ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
+import { Bike, Package, Truck, Wrench, ArrowRight, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 const services = [
   {
     id: 1,
+    slug: "global-showroom",
     icon: Bike,
     title: "Global Showroom",
     description: "Access our entire digital inventory featuring the world's most exclusive electric and ICE motorcycles.",
@@ -15,6 +17,7 @@ const services = [
   },
   {
     id: 2,
+    slug: "artifact-custody",
     icon: Package,
     title: "Artifact Custody",
     description: "White-glove parts procurement with authenticated blockchain tracking for every component.",
@@ -23,6 +26,7 @@ const services = [
   },
   {
     id: 3,
+    slug: "titanium-forge",
     icon: Wrench,
     title: "Titanium Forge",
     description: "Certified masters providing bespoke modifications and deep-cycle maintenance for high-performance builds.",
@@ -31,6 +35,7 @@ const services = [
   },
   {
     id: 4,
+    slug: "stealth-logistics",
     icon: Truck,
     title: "Stealth Logistics",
     description: "Encrypted, climate-controlled delivery to your specific GPS coordinates across the globe.",
@@ -43,7 +48,7 @@ export default function Services() {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
-    <section className="py-24 bg-black relative overflow-hidden">
+    <section className="py-16 bg-black relative overflow-hidden">
        {/* Background Decoration - Animated Blobs */}
        <motion.div 
          animate={{ 
@@ -75,7 +80,7 @@ export default function Services() {
                         initial={{ opacity: 0, scale: 1.1 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.8, ease: "circOut" }}
+                        transition={{ duration: 0.4, ease: "circOut" }}
                         className="absolute inset-0"
                       >
                          <motion.div
@@ -133,7 +138,7 @@ export default function Services() {
 
              {/* Right Column: Service Steps */}
              <div className="w-full lg:w-1/2 pt-10">
-                <div className="mb-12">
+                <div className="mb-8">
                    <motion.div
                       initial={{ opacity: 0, x: -50 }}
                       whileInView={{ opacity: 1, x: 0 }}
@@ -143,7 +148,7 @@ export default function Services() {
                       <div className="h-[2px] w-12 bg-primary"></div>
                       <span className="text-white font-bold tracking-[0.4em] text-sm uppercase">Core Operations</span>
                    </motion.div>
-                   <h2 className="text-5xl md:text-6xl font-black text-white leading-none tracking-tighter mb-6">
+                   <h2 className="text-5xl md:text-6xl font-black text-white leading-none tracking-tighter mb-4">
                       BEYOND THE <br />
                       <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600 font-outline-xs">STANDARD</span>
                    </h2>
@@ -152,46 +157,50 @@ export default function Services() {
                    </p>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                    {services.map((service, index) => {
                      const Icon = service.icon;
                      const isActive = activeTab === index;
 
                      return (
-                       <motion.div
-                         key={index}
-                         onMouseEnter={() => setActiveTab(index)}
-                         className={`group relative p-8 rounded-[2rem] border transition-all duration-500 cursor-pointer ${
-                           isActive 
-                           ? "bg-white/5 border-primary/50 shadow-[0_0_30px_rgba(var(--primary-rgb),0.1)]" 
-                           : "bg-transparent border-white/10 hover:border-white/30"
-                         }`}
-                       >
-                          <div className="flex items-start gap-6">
-                             <div className={`p-4 rounded-2xl transition-all duration-500 ${
-                               isActive ? "bg-primary text-black" : "bg-white/5 text-gray-400 group-hover:text-white"
-                             }`}>
-                                <Icon className="h-6 w-6" />
-                             </div>
-                             
-                             <div className="flex-1">
-                                <h3 className={`text-xl font-bold mb-2 transition-colors duration-500 ${
-                                  isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-                                }`}>
-                                   {service.title}
-                                </h3>
-                                <p className={`text-sm leading-relaxed transition-colors duration-500 ${
-                                  isActive ? "text-gray-300" : "text-gray-500 group-hover:text-gray-400"
-                                }`}>
-                                   {service.description}
-                                </p>
-                             </div>
+                       <Link href={`/services/${service.slug}`} key={index} className="block">
+                         <motion.div
+                           onMouseEnter={() => setActiveTab(index)}
+                           className={`group relative py-5 px-8 rounded-[2rem] border transition-all duration-500 cursor-pointer ${
+                             isActive 
+                             ? "bg-white/5 border-white/20 shadow-2xl" 
+                             : "bg-transparent border-white/10 hover:border-white/30"
+                           }`}
+                         >
+                            <div className="flex items-start gap-6">
+                               <motion.div 
+                                 animate={isActive ? { scale: 1.1, rotate: 8 } : { scale: 1, rotate: 0 }}
+                                 whileHover={{ scale: 1.2, rotate: 12 }}
+                                 className={`p-4 rounded-2xl transition-all duration-500 ${
+                                  isActive ? `${service.accent} text-black font-black shadow-lg shadow-black/20` : "bg-white/5 text-gray-400 group-hover:text-white"
+                               }`}>
+                                  <Icon className="h-6 w-6 transition-transform group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" />
+                               </motion.div>
+                               
+                               <div className="flex-1">
+                                  <h3 className={`text-xl font-bold mb-2 transition-colors duration-500 ${
+                                    isActive ? "text-white" : "text-gray-400 group-hover:text-white"
+                                  }`}>
+                                     {service.title}
+                                  </h3>
+                                  <p className={`text-sm leading-relaxed transition-colors duration-500 ${
+                                    isActive ? "text-gray-300" : "text-gray-500 group-hover:text-gray-400"
+                                  }`}>
+                                     {service.description}
+                                  </p>
+                               </div>
 
-                             <div className={`mt-2 transition-transform duration-500 ${isActive ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"}`}>
-                                <ArrowRight className="h-5 w-5 text-primary" />
-                             </div>
-                          </div>
-                       </motion.div>
+                               <div className={`mt-2 transition-all duration-500 ${isActive ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0"}`}>
+                                  <ArrowRight className={`h-5 w-5 ${isActive ? service.accent.replace('bg-', 'text-') : 'text-primary'}`} />
+                               </div>
+                            </div>
+                         </motion.div>
+                       </Link>
                      );
                    })}
                 </div>

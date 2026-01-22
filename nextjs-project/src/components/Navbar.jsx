@@ -14,7 +14,7 @@ import { Logo } from "./ui/Logo";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { cartCount } = useCart();
   const { wishlistCount } = useWishlist();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -60,7 +60,12 @@ export default function Navbar() {
               </Link>
             ))}
             
-            {session ? (
+            {status === "loading" ? (
+              <div className="flex items-center space-x-4 h-8">
+                <div className="h-4 w-24 bg-gray-100 animate-pulse rounded-full" />
+                <div className="h-8 w-16 bg-gray-100 animate-pulse rounded-lg" />
+              </div>
+            ) : session ? (
               <>
                 {['admin', 'merchandiser', 'dealer'].includes(session.user.role) && (
                   <Link
@@ -228,7 +233,12 @@ export default function Navbar() {
               </Link>
             ))}
             
-            {session ? (
+            {status === "loading" ? (
+              <div className="flex flex-col gap-2 p-2">
+                <div className="h-8 w-full bg-gray-100 animate-pulse rounded-lg" />
+                <div className="h-8 w-full bg-gray-100 animate-pulse rounded-lg" />
+              </div>
+            ) : session ? (
               <>
                 {['admin', 'merchandiser', 'dealer'].includes(session.user.role) && (
                   <Link

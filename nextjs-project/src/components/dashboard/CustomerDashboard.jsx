@@ -455,12 +455,19 @@ export default function CustomerDashboard({ user }) {
                       </div>
 
                       {/* Visual Timeline */}
-                      <div className="relative flex justify-between w-full max-w-3xl mx-auto mt-8 mb-4">
-                        {/* Connecting Line */}
-                        <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-100 -translate-y-1/2 z-0"></div>
+                      <div className="relative flex flex-col md:flex-row justify-between w-full max-w-3xl mx-auto mt-8 mb-4 gap-8 md:gap-0">
+                        {/* Connecting Line (Horizontal - md+) */}
+                        <div className="absolute top-4 left-0 w-full h-1 bg-slate-100 z-0 hidden md:block"></div>
                         <div 
-                           className="absolute top-1/2 left-0 h-1 bg-green-500 -translate-y-1/2 z-0 transition-all duration-500"
+                           className="absolute top-4 left-0 h-1 bg-green-500 z-0 transition-all duration-500 hidden md:block"
                            style={{ width: `${(activeStepIndex / (steps.length - 1)) * 100}%` }}
+                        ></div>
+
+                        {/* Connecting Line (Vertical - <md) */}
+                        <div className="absolute left-4 top-0 bottom-0 w-1 bg-slate-100 z-0 md:hidden"></div>
+                        <div 
+                           className="absolute left-4 top-0 w-1 bg-green-500 z-0 transition-all duration-500 md:hidden"
+                           style={{ height: `${(activeStepIndex / (steps.length - 1)) * 100}%` }}
                         ></div>
 
                         {steps.map((step, index) => {
@@ -468,10 +475,10 @@ export default function CustomerDashboard({ user }) {
                           const isCurrent = index === activeStepIndex;
                           
                           return (
-                            <div key={step.id} className="relative z-10 flex flex-col items-center gap-2">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
+                            <div key={step.id} className="relative z-10 flex flex-row md:flex-col items-center gap-4 md:gap-2">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 flex-shrink-0 ${
                                 isCompleted 
-                                  ? "bg-green-500 text-white shadow-lg shaodw-green-200" 
+                                  ? "bg-green-500 text-white shadow-lg shadow-green-200" 
                                   : "bg-slate-100 text-slate-400"
                               }`}>
                                 {isCompleted ? <CheckCircle className="h-4 w-4" /> : (index + 1)}

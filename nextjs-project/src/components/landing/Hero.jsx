@@ -183,9 +183,9 @@ export default function Hero() {
               </p>
 
               {/* CTA */}
-              <div className="flex items-center gap-6">
-                <Link href="/bikes">
-                  <Button size="lg" className="bg-primary text-white hover:bg-primary/90 h-12 px-8 text-base font-bold tracking-wide rounded-none">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <Link href="/bikes" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto bg-primary text-white hover:bg-primary/90 h-12 px-8 text-base font-bold tracking-wide rounded-none">
                     EXPLORE MODEL
                   </Button>
                 </Link>
